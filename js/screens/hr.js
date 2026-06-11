@@ -86,9 +86,9 @@
         ${card("Cross-module queue (sample)", table(
           [{ h: "ID" }, { h: "Type" }, { h: "Who" }, { h: "Stage" }, { h: "Age", r: 1 }, { h: "", r: 1 }],
           [
-            { cells: [idtag("TC-0109"), "Correction", "Latsamy V.", "Adjust ledger", `<span class="num">0.4 d</span>`, `<button class="btn xs soft" data-act="toast:Ledger adjusted — audit-logged">Post</button>`] },
-            { cells: [idtag("PRF-0042"), "Profile change", "Davone P.", "Bank account update", `<span class="num">0.7 d</span>`, `<button class="btn xs soft" data-act="toast:Profile change approved">Approve</button>`] },
-            { cells: [idtag("DOC-0290"), "Document", "Manysone V.", "Salary certificate", `<span class="num">0.2 d</span>`, `<button class="btn xs soft" data-act="toast:Generated — serial DOC-0290, e-signed">Generate</button>`] }
+            { cells: [idtag("TC-0109"), "Correction", "Latsamy V.", "Adjust ledger", `<span class="num">0.4 d</span>`, `<button class="btn xs soft" data-act="wf-ledger-adjust">Post</button>`] },
+            { cells: [idtag("PRF-0042"), "Profile change", "Davone P.", "Bank account update", `<span class="num">0.7 d</span>`, `<button class="btn xs soft" data-act="wf-profile-approve">Approve</button>`] },
+            { cells: [idtag("DOC-0290"), "Document", "Manysone V.", "Salary certificate", `<span class="num">0.2 d</span>`, `<button class="btn xs soft" data-act="gen-doc:hr-salary-manysone">Generate</button>`] }
           ]), { icon: "layers" })}`
       };
     },
@@ -112,7 +112,7 @@
         ]), { icon: "file" })}</div>
           <div>${r.status === "pending" ? card("Decide", `<div style="display:flex;flex-direction:column;gap:8px">
             <button class="btn ok" data-act="approve:${r.id}">${icon("check")} Settle via payroll</button>
-            <button class="btn ghost" data-act="toast:Routed to finance export instead">${icon("send")} Settle via finance</button>
+            <button class="btn ghost" data-act="wf-route-finance">${icon("send")} Settle via finance</button>
             <button class="btn danger" data-act="return:${r.id}">${icon("x")} Return</button>
           </div>`, { icon: "settings" }) : card("Done", `<p class="small muted">Settled — lands on pay run PR-2026-06 as a reimbursement line.</p>`, { icon: "check" })}</div>
         </div>`
@@ -245,7 +245,7 @@
     people() {
       return {
         title: "People & Org", sub: "Master record and the org backbone — every other module reads from here. Live from db_people: hire, reassign and offboard.",
-        actions: `<button class="btn soft" data-act="toast:Org chart export queued">${icon("download")} Org chart</button><button class="btn" data-go="hr/web/person-new">${icon("plus")} New hire</button>`,
+        actions: `<button class="btn soft" data-act="export:orgchart">${icon("download")} Org chart</button><button class="btn" data-go="hr/web/person-new">${icon("plus")} New hire</button>`,
         body: `
         <div class="grid cols-4">
           ${kpi("Active staff", String(DATA.employees.length), DATA.org().newMoM + " MoM · db_people live", { hero: 1 })}
@@ -276,7 +276,7 @@
       return {
         title: p.name, sub: `${p.pos} · ${p.div} — the master record (full HR lens).`,
         crumbs: [{ label: "People & Org", go: "hr/web/people" }, { label: p.id }],
-        actions: `<button class="btn ghost" data-act="toast:Letter generated from TPL-014 — serial DOC-0294">${icon("file")} Generate letter</button><button class="btn soft" data-act="toast:Edit mode is a build-phase feature">${icon("edit")} Edit</button>`,
+        actions: `<button class="btn ghost" data-act="gen-doc:hr-person-letter">${icon("file")} Generate letter</button><button class="btn soft soon" title="Build-phase feature — not wired in this UI preview" data-act="toast:Edit mode is a build-phase feature">${icon("edit")} Edit</button>`,
         body: `
         <div class="grid cols-3">
           <div class="card span-2">
@@ -312,7 +312,7 @@
     time() {
       return {
         title: "Time & Attendance", sub: "Org-wide live board from the attendance ledger — multi-source capture, one truth.",
-        actions: `<button class="btn ghost" data-act="toast:Exceptions report generated">${icon("download")} Exceptions</button>`,
+        actions: `<button class="btn ghost" data-act="export:exceptions">${icon("download")} Exceptions</button>`,
         body: `
         <div class="grid cols-4">
           ${kpi("Present", String(DATA.org().present), `${DATA.org().presentPct} of ${DATA.org().headcount}`, { hero: 1 })}
@@ -331,9 +331,9 @@
         ${card("Exceptions — today", table(
           [{ h: "Who" }, { h: "Exception" }, { h: "Source" }, { h: "Status" }, { h: "", r: 1 }],
           [
-            { cells: ["Keo Sayavong", "No-show · 2nd this month", "Roster check", badge("flagged"), `<button class="btn xs soft" data-act="toast:Escalated on PV ladder — manager coached, HR recorded">Escalate</button>`] },
-            { cells: ["Noy Keomany", "Late 09:12 (+42m)", "Device scan", badge("late"), `<button class="btn xs ghost" data-act="toast:Noted — monitoring">Note</button>`] },
-            { cells: ["6 staff", "Missing punch", "Ledger scan", badge("pending"), `<button class="btn xs ghost" data-act="toast:Correction reminders sent (TC flow)">Remind</button>`] }
+            { cells: ["Keo Sayavong", "No-show · 2nd this month", "Roster check", badge("flagged"), `<button class="btn xs soft" data-act="wf-pv-escalate">Escalate</button>`] },
+            { cells: ["Noy Keomany", "Late 09:12 (+42m)", "Device scan", badge("late"), `<button class="btn xs ghost" data-act="wf-note-monitor">Note</button>`] },
+            { cells: ["6 staff", "Missing punch", "Ledger scan", badge("pending"), `<button class="btn xs ghost" data-act="wf-correction-reminders">Remind</button>`] }
           ]), { icon: "alert" })}`
       };
     },
@@ -341,7 +341,7 @@
     leave() {
       return {
         title: "Leave & Absence", sub: "Configurable types and accrual — wired to the calendar and payroll.",
-        actions: `<button class="btn soft" data-act="toast:Holiday calendar opens — localizable per country">${icon("calendar")} Holiday calendar</button>`,
+        actions: `<button class="btn soft soon" title="Build-phase feature — not wired in this UI preview" data-act="toast:Holiday calendar is a build-phase feature — localizable per country at build time">${icon("calendar")} Holiday calendar</button>`,
         body: `
         <div class="grid cols-4">
           ${kpi("On leave today", "5", "2.0% of org", { hero: 1 })}
@@ -406,7 +406,7 @@
           { t: "Approve", s: "HR sign-off" }, { t: "Disburse", s: "bank file + payslips" }
         ], r.step - 1) + (canAdvance ? `<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap">
           <button class="btn" data-act="advance-run:${r.id}">${icon("chevR")} ${["", "Validate run", "Approve run", "Disburse & export", ""][r.step]}</button>
-          <button class="btn ghost" data-act="toast:Variance report generated — 3 items over threshold">${icon("eye")} Variance check</button>
+          <button class="btn ghost" data-act="export:variance">${icon("eye")} Variance check</button>
         </div>` : `<p class="small muted" style="margin-top:12px">Disbursed — payslips published to staff mobile, burn posted to the CEO board.</p>`), { icon: "banknote" })}
         <div class="grid cols-3">
           ${kpi("Staff in run", String(DATA.org().runStaff), "joiners prorated")}
@@ -434,9 +434,9 @@
         </div>
         <div class="grid cols-2" style="margin-top:16px">
           ${card("Generate now", `<div class="choice-row" style="margin-bottom:12px">
-            <button class="choice" data-act="toast:Employment letter — pick employee, serial auto-assigned">${icon("file")} Employment letter</button>
-            <button class="choice" data-act="toast:Salary certificates — bulk for Finance div (22)">${icon("banknote")} Salary certificate</button>
-            <button class="choice" data-act="toast:Contract renewals — 3 expiring contracts pre-filled">${icon("refresh")} Contract renewal</button>
+            <button class="choice" data-act="gen-doc:hr-employment-letter">${icon("file")} Employment letter</button>
+            <button class="choice" data-act="gen-doc:hr-bulk-salary-finance">${icon("banknote")} Salary certificate</button>
+            <button class="choice" data-act="gen-doc:hr-contract-renewals">${icon("refresh")} Contract renewal</button>
           </div><p class="small muted">Each pulls merge fields from the people-ledger and routes via flow J (DOC-####).</p>`, { icon: "sparkle" })}
           ${card("Expiry watchlist", rowlist([
           rowitem({ icon: "alert", title: "3 contracts — Jul 2026", sub: "Davone P. +2 · renewal letters ready", side: badge("expiring") }),
@@ -485,8 +485,8 @@
         <div class="grid cols-2">${kpi("L2 items", String(DATA.pendingL2().length + 22), "waiting", { hero: 1 })}${kpi("Present", "95.1%", "236 of 248")}</div>
         ${card("Settle", l2queue("mobile", true), { icon: "inbox" })}
         ${card("Cross-module", rowlist([
-          rowitem({ icon: "edit", title: "TC-0109 · ledger adjust", sub: "Latsamy V.", side: `<button class="btn xs soft" data-act="toast:Posted">Post</button>` }),
-          rowitem({ icon: "file", title: "DOC-0290 · salary cert", sub: "Manysone V.", side: `<button class="btn xs soft" data-act="toast:Generated & e-signed">Go</button>` })
+          rowitem({ icon: "edit", title: "TC-0109 · ledger adjust", sub: "Latsamy V.", side: `<button class="btn xs soft" data-act="wf-ledger-adjust">Post</button>` }),
+          rowitem({ icon: "file", title: "DOC-0290 · salary cert", sub: "Manysone V.", side: `<button class="btn xs soft" data-act="gen-doc:hr-salary-manysone">Go</button>` })
         ]), { icon: "layers" })}`
       };
     },

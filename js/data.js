@@ -188,6 +188,17 @@ window.DATA = (function () {
   }
   const myPayslips = () => DB.list("db_payroll", "payslips").filter(p => p.emp === me.staff.id);
   const myDocs = () => DB.list("db_docs", "documents").filter(d => d.emp === me.staff.id);
+  /* ---------- document generation (flow J · DOC-####) — writes a real db_docs row ---------- */
+  function nextDocId() {
+    const max = DB.list("db_docs", "documents").reduce((m, d) => Math.max(m, Number(String(d.id).replace(/\D/g, "")) || 0), 0);
+    return "DOC-0" + (Math.max(max, 289) + 1); // continue the HR serial line (…DOC-0290+)
+  }
+  function generateDoc(f) {
+    const id = nextDocId();
+    DB.add("db_docs", "documents", { id, emp: f.emp || me.staff.id, name: f.name, kind: f.kind || "Letter", expiry: f.expiry || "—", status: f.status || "issued" }, f.who || shortName(me.staff.name));
+    notify();
+    return id;
+  }
   function advanceRun(id) {
     const r = DB.list("db_payroll", "payroll_runs").find(x => x.id === id);
     if (!r || r.step >= 4) return;
@@ -228,7 +239,7 @@ window.DATA = (function () {
     get sent()              { return DB.list("db_comms", "messages"); },
     approve, ret, clock, submitRequest, advanceRun, sendComms,
     pendingL1, pendingL2, mine, myPayslips, myDocs,
-    hireStaff, offboardStaff, reassignStaff,
+    hireStaff, offboardStaff, reassignStaff, generateDoc, nextDocId,
     setActingStaff, actingStaffId: () => actingStaffId,
     has, unlockLabel, setTier, org,
     tier: () => state.tier,

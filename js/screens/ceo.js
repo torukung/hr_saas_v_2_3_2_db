@@ -34,7 +34,7 @@
     board() {
       return {
         title: "Executive board — Q2 2026", sub: "Aggregates over the same ledger everyone else writes — no individuals, drill-down and export only.",
-        actions: `${ro} <button class="btn ghost" data-act="toast:Board pack queued — compiled to PDF each period">${icon("download")} ${t("common.export")} board pack</button>`,
+        actions: `${ro} <button class="btn ghost" data-act="export:boardpack">${icon("download")} ${t("common.export")} board pack</button>`,
         body: `
         <div class="grid cols-4">${boardKpis()}</div>
         <div class="grid cols-3" style="margin-top:16px">
@@ -164,7 +164,7 @@
         title: "Board packs", sub: "Compiled from aggregates on demand — each pack keeps its last 3 runs with query detail; click a run to view (read-only) or download. Older runs move to file storage.",
         actions: `${ro}<button class="btn ghost" data-go="ceo/web/report-files">${icon("folder")} File storage</button>`,
         body: REP.library("ceo", "ceo/web") +
-          card("Schedule", `<p class="small muted" style="margin-bottom:10px">Compiled monthly on the 1st, quarterly on close — delivered to the board via email channel.</p><button class="btn ghost sm" data-act="toast:Delivery schedule is owned by HR/SysAdmin — request sent">${icon("send")} Request a change</button>`, { icon: "calendar" })
+          card("Schedule", `<p class="small muted" style="margin-bottom:10px">Compiled monthly on the 1st, quarterly on close — delivered to the board via email channel.</p><button class="btn ghost sm soon" title="Owned by HR / SysAdmin — not actionable from the read-only CEO view" data-act="toast:Delivery schedule is owned by HR / SysAdmin — not actionable from the read-only CEO view">${icon("send")} Request a change</button>`, { icon: "calendar" })
       };
     },
 

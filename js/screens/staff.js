@@ -233,7 +233,7 @@
             ${card("Actions", `<div style="display:flex;flex-direction:column;gap:8px">
               ${r.status === "pending" ? `<button class="btn ghost">${icon("x")} Cancel request</button>` : ""}
               ${r.status === "returned" ? `<button class="btn" data-go="staff/web/request-new/${r.type}">${icon("edit")} Edit & resubmit</button>` : ""}
-              <button class="btn ghost" data-act="toast:History exported">${icon("download")} Export history</button>
+              <button class="btn ghost" data-act="export:reqhistory">${icon("download")} Export history</button>
             </div>`, { icon: "settings" })}
             ${card("One ledger, many lenses", `<p class="small muted">Your manager sees ${idtag(r.id)} in the L1 queue; HR sees it in cross-module approvals; the CEO only ever sees it inside aggregates. Approve it in the Manager persona and watch this page update.</p>`, { icon: "refresh" })}
           </div>
@@ -263,7 +263,7 @@
               <div class="num" style="font-family:var(--display);font-size:38px;font-weight:550;letter-spacing:-.03em">${kip(p.net)}</div>
               <div class="small muted">Paid ${p.paid} · BCEL ··4821</div></div>
               <div style="display:flex;gap:8px"><button class="btn" data-go="staff/web/payslip/${p.id}">${icon("eye")} View</button>
-              <button class="btn ghost" data-act="toast:Payslip PDF downloaded">${icon("download")} PDF</button></div>
+              <button class="btn ghost" data-act="export:payslip">${icon("download")} PDF</button></div>
             </div>
           </div>
           ${card("Year to date", rowlist([
@@ -286,7 +286,7 @@
       return {
         title: "Payslip — " + p.period, sub: "One ledger line per pay code · statutory items computed by the localizable rules pack.",
         crumbs: [{ label: "Payslips", go: "staff/web/payslips" }, { label: p.id }],
-        actions: `<button class="btn ghost" data-act="toast:Payslip PDF downloaded">${icon("download")} PDF</button><button class="btn ghost" data-act="toast:Tax statement requested">${icon("file")} Tax statement</button>`,
+        actions: `<button class="btn ghost" data-act="export:payslip">${icon("download")} PDF</button><button class="btn ghost" data-act="export:tax">${icon("file")} Tax statement</button>`,
         body: payslipDetailBody(id, "web")
       };
     },
@@ -302,16 +302,16 @@
           })))
           : empty("folder", "No documents on file yet", "HR uploads contracts & IDs at onboarding — request one below.")), { icon: "folder" })}
           ${card("Policies to acknowledge", rowlist([
-          rowitem({ icon: "shield", title: "Code of conduct v4", sub: "Published Jun 02 · due Jun 20", side: `<button class="btn xs" data-act="toast:Acknowledged — recorded to the audit ledger">Acknowledge</button>` }),
+          rowitem({ icon: "shield", title: "Code of conduct v4", sub: "Published Jun 02 · due Jun 20", side: `<button class="btn xs" data-act="wf-ack-policy">Acknowledge</button>` }),
           rowitem({ icon: "shield", title: "Safety handbook v7", sub: "Acknowledged May 12", side: badge("ok") })
         ]), { icon: "check" })}
         </div>
         ${card("Request a document", `
           <p class="small muted" style="margin-bottom:12px">Generated from System-Admin templates with serial number + e-signature (flow J · DOC-####). Self-service where policy allows.</p>
           <div class="choice-row">
-            <button class="choice" data-act="toast:Requested — Salary certificate (DOC-0291)">${icon("banknote")} Salary certificate</button>
-            <button class="choice" data-act="toast:Requested — Employment verification (DOC-0292)">${icon("check")} Employment verification</button>
-            <button class="choice" data-act="toast:Requested — Leave & attendance record (DOC-0293)">${icon("calendar")} Attendance record</button>
+            <button class="choice" data-act="gen-doc:staff-salary">${icon("banknote")} Salary certificate</button>
+            <button class="choice" data-act="gen-doc:staff-employment">${icon("check")} Employment verification</button>
+            <button class="choice" data-act="gen-doc:staff-attendance">${icon("calendar")} Attendance record</button>
           </div>`, { icon: "send" })}`
       };
     },
@@ -321,7 +321,7 @@
       const m = DATA.me.staff;
       return {
         title: "My data", sub: "Exactly which stores hold your records — your own slice, addable & deletable where policy allows. Scope enforced by the kernel.",
-        actions: `<button class="btn ghost" data-act="toast:Your data export has been queued — delivered as a signed file (GDPR-style takeout)">${icon("download")} Export my data</button>`,
+        actions: `<button class="btn ghost" data-act="export:mydata">${icon("download")} Export my data</button>`,
         body: `
         <div class="grid cols-3">
           <div class="span-2" style="display:flex;flex-direction:column;gap:16px">
@@ -369,7 +369,7 @@
       const m = DATA.me.staff;
       return {
         title: "My profile", sub: "Own-slice edits — sensitive changes route through an approval, everything is audit-logged.",
-        actions: `<button class="btn soft" data-act="toast:Change request opened (PR flow)">${icon("edit")} Request change</button>`,
+        actions: `<button class="btn soft" data-act="wf-profile-request">${icon("edit")} Request change</button>`,
         body: `
         <div class="grid cols-3">
           <div class="card span-2">

@@ -41,7 +41,7 @@
       const pend = DATA.pendingL1().length;
       return {
         title: "Team overview", sub: "Production Line A · Wednesday, Jun 10 — approvals first, then the day.",
-        actions: `<button class="btn soft" data-act="toast:Nudge sent to 1 late, 1 absent">${icon("megaphone")} Message team</button>
+        actions: `<button class="btn soft" data-act="comms-nudge">${icon("megaphone")} Message team</button>
                   <button class="btn" data-go="manager/web/approvals">${icon("inbox")} Open queue${pend ? ` · ${pend}` : ""}</button>`,
         body: `
         <div class="grid cols-4">
@@ -57,7 +57,7 @@
           </div>
           <div style="display:flex;flex-direction:column;gap:16px">
             ${card("Alerts", rowlist([
-          rowitem({ icon: "alert", title: "Keo — no-show today", sub: "2nd this month · policy ladder step 1", side: `<button class="btn xs soft" data-act="toast:Coaching note recorded (PV flow)">Coach</button>` }),
+          rowitem({ icon: "alert", title: "Keo — no-show today", sub: "2nd this month · policy ladder step 1", side: `<button class="btn xs soft" data-act="wf-coaching">Coach</button>` }),
           rowitem({ icon: "clock", title: "Noy — late 09:12", sub: "+42 min · auto-flagged", side: badge("late") }),
           rowitem({ icon: "user", title: "Probation review due", sub: "Chanthala · by Jun 15", side: badge("pending") })
         ]), { icon: "bell" })}
@@ -74,7 +74,7 @@
       const pend = DATA.pendingL1();
       return {
         title: "Approvals — L1 queue", sub: "Inline approve / return with SLA timers. Claims you approve continue to HR / Finance (L2).",
-        actions: `<button class="btn ghost" data-act="toast:All caught up — nothing auto-approvable">${icon("check")} Approve all routine</button>`,
+        actions: `<button class="btn ghost soon" title="Build-phase feature — not wired in this UI preview" data-act="toast:Auto-approve routine is a build-phase feature — review items individually in this preview">${icon("check")} Approve all routine</button>`,
         body: `
         <div class="grid cols-4">
           ${kpi("Waiting", String(pend.length), "in your queue", { hero: 1 })}
@@ -119,7 +119,7 @@
               <div style="display:flex;flex-direction:column;gap:8px">
                 <button class="btn ok" data-act="approve:${r.id}">${icon("check")} ${t("common.approve")}${r.type === "Claim" ? " → HR / Finance" : ""}</button>
                 <button class="btn danger" data-act="return:${r.id}">${icon("x")} ${t("common.return")} with note</button>
-                ${DATA.has("delegation") ? `<button class="btn ghost" data-act="toast:Delegated to acting supervisor">${icon("users")} Delegate</button>` : UI.lockBtn("Delegate", DATA.unlockLabel("delegation"), "ghost")}
+                ${DATA.has("delegation") ? `<button class="btn ghost" data-act="wf-delegate">${icon("users")} Delegate</button>` : UI.lockBtn("Delegate", DATA.unlockLabel("delegation"), "ghost")}
               </div>`, { icon: "settings" }) : card("Decided", `<p class="small muted">This item is ${r.status} — see the audit ledger for the trail.</p>`, { icon: "check" })}
             ${card("Requester snapshot", rowlist([
           rowitem({ icon: "check", title: "Attendance 98%", sub: "90-day", side: "" }),
@@ -134,7 +134,7 @@
     team() {
       return {
         title: "Team — Production Line A", sub: "8 reports · live state from the attendance ledger.",
-        actions: `<button class="btn soft" data-act="toast:Team report queued — delivered to your inbox">${icon("download")} Team report</button>`,
+        actions: `<button class="btn soft" data-act="export:teamreport">${icon("download")} Team report</button>`,
         body: `
         <div class="grid cols-4">
           ${kpi("Present", `${present()}/8`, "on shift", { hero: 1 })}
@@ -180,7 +180,7 @@
       const shift = (label, tone) => `<td><span class="badge ${tone}">${label}</span></td>`;
       return {
         title: "Schedule — week 24", sub: "Shift templates and rotations live in the Time cell; edits publish to staff mobile instantly.",
-        actions: `<button class="btn ghost" data-act="toast:Week duplicated to week 25">${icon("files")} Duplicate week</button><button class="btn" data-act="toast:Schedule published — team notified via push">${icon("send")} Publish</button>`,
+        actions: `<button class="btn ghost soon" title="Build-phase feature — not wired in this UI preview" data-act="toast:Duplicate week is a build-phase scheduling feature — not wired in this preview">${icon("files")} Duplicate week</button><button class="btn" data-act="comms-publish">${icon("send")} Publish</button>`,
         body: card("", `<div class="tablewrap"><table class="tbl">
           <thead><tr><th>Member</th>${days.map(d => `<th>${d}</th>`).join("")}</tr></thead>
           <tbody>${DATA.team.slice(0, 6).map((m, i) => `<tr>
@@ -195,7 +195,7 @@
     teamdata() {
       return {
         title: "Team data", sub: "Your team's rows in db_people and db_workflow — scoped by RBAC, addable & deletable so the live DB is easy to grasp.",
-        actions: `<button class="btn ghost" data-act="toast:Team data extract queued — scoped to Production Line A">${icon("download")} Export team slice</button>`,
+        actions: `<button class="btn ghost" data-act="export:teamslice">${icon("download")} Export team slice</button>`,
         body: `
         <div class="grid cols-3">
           <div class="span-2" style="display:flex;flex-direction:column;gap:16px">

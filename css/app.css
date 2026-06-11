@@ -507,6 +507,10 @@ button.locked:hover, .choice.locked:hover{ transform:none !important; filter:gra
 .pchip.locked{ opacity:.55; }
 .pchip.locked .dot{ display:none; }
 .pchip .lk{ width:11px; height:11px; opacity:.75; flex:none; }
+/* ---------- build-phase features — greyed "soon" affordance (no backing data yet, ≠ tier-lock) ---------- */
+.soon, .soon *{ cursor:not-allowed !important; }
+button.soon, .choice.soon{ opacity:.5; filter:grayscale(.45); box-shadow:none !important; }
+button.soon:hover, .choice.soon:hover{ transform:none !important; filter:grayscale(.45); }
 .hub-card.locked .swatch{ filter:grayscale(.85); opacity:.55; }
 .hub-card.locked .who, .hub-card.locked h3, .hub-card.locked .tag, .hub-card.locked li{ color:var(--muted); }
 .hub-card.locked li::before{ background:var(--muted-2); }

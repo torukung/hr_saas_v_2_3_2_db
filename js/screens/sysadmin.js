@@ -22,7 +22,7 @@
     health() {
       return {
         title: "Platform health", sub: "The control plane at a glance — channels, integrations, sessions and the audit pulse.",
-        actions: `<button class="btn soft" data-act="toast:Test message sent on every live gateway">${icon("plug")} Test gateways</button>`,
+        actions: `<button class="btn soft" data-act="comms-test-all">${icon("plug")} Test gateways</button>`,
         body: `
         <div class="grid cols-4">
           ${kpi("Delivery rate", "99.1%", "email · SMS · push blended", { hero: 1 })}
@@ -33,7 +33,7 @@
         <div class="grid cols-3" style="margin-top:16px">
           <div class="span-2" style="display:flex;flex-direction:column;gap:16px">
             ${card("Needs attention", rowlist([
-          rowitem({ icon: "x", title: "LINE OA webhook — down", sub: "since 09:31 · failover active · HR notified", side: `<button class="btn xs soft" data-act="toast:Reconnect attempted — vendor side, ticket raised">Reconnect</button>` }),
+          rowitem({ icon: "x", title: "LINE OA webhook — down", sub: "since 09:31 · failover active · HR notified", side: `<button class="btn xs soft" data-act="comms-reconnect:line-oa-bridge">Reconnect</button>` }),
           rowitem({ icon: "alert", title: "SMS sender ID cert — expiring", sub: "LaoTel · renew by Jul 01", side: badge("expiring") }),
           rowitem({ icon: "file", title: "2 templates awaiting review", sub: "TPL-023 · TPL-026", side: `<button class="btn xs ghost" data-go="sysadmin/web/templates">Review</button>` }),
           rowitem({ icon: "key", title: "1 role request", sub: "manager → team reports scope", side: `<button class="btn xs ghost" data-go="sysadmin/web/roles">Decide</button>` })
@@ -51,7 +51,7 @@
     templates() {
       return {
         title: "Content & templates — CMS", sub: "Author once, reuse everywhere: letters, emails, SMS, custom frames — versioned draft → review → publish.",
-        actions: `<button class="btn" data-act="toast:New frame — pick a base: letter · email · SMS · custom">${icon("plus")} New template</button>`,
+        actions: `<button class="btn" data-act="comms-new-template">${icon("plus")} New template</button>`,
         body: `
         <div class="grid cols-4">
           ${kpi("Published", "14", "in the library", { hero: 1 })}
@@ -85,9 +85,9 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
               <span class="hint">Merge fields: {{first_name}} · {{date}} · {{site}} · {{position}} · {{employee_id}} — validated against the people-ledger schema.</span>
             </div>
             <div style="display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap">
-              <button class="btn ghost" data-act="toast:Preview rendered with sample data">${icon("eye")} Preview</button>
-              <button class="btn ghost" data-act="toast:ລາວ variant opens side-by-side in the build phase">${icon("globe")} ລາວ variant</button>
-              ${isPub ? `<button class="btn soft" data-act="toast:Cloned as custom frame — yours to edit">${icon("files")} Clone as custom</button>` : `<button class="btn" data-act="toast:${tp.id} v${tp.v} published — locked, dated, audit-logged">${icon("check")} Publish v${tp.v}</button>`}
+              <button class="btn ghost" data-act="comms-preview-template:${tp.id}">${icon("eye")} Preview</button>
+              <button class="btn ghost soon" title="Build-phase feature — not wired in this UI preview" data-act="toast:ລາວ variant opens side-by-side in the build phase">${icon("globe")} ລາວ variant</button>
+              ${isPub ? `<button class="btn soft" data-act="comms-clone-template:${tp.id}">${icon("files")} Clone as custom</button>` : `<button class="btn" data-act="comms-publish-template:${tp.id}">${icon("check")} Publish v${tp.v}</button>`}
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:16px">
@@ -105,13 +105,13 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
     channels() {
       return {
         title: "Channels & gateways", sub: "Email, SMS, push and webhooks — sender identities, keys and fallbacks live here.",
-        actions: `<button class="btn" data-act="toast:Add channel — pick provider, paste credentials, send test">${icon("plus")} Add channel</button>`,
+        actions: `<button class="btn" data-act="comms-add-channel">${icon("plus")} Add channel</button>`,
         body: `
         ${card("Gateways", table(
           [{ h: "Channel" }, { h: "Endpoint / ID" }, { h: "Today", r: 1 }, { h: "Delivery", r: 1 }, { h: "Status" }, { h: "", r: 1 }],
           DATA.channels.map(c => ({
             cells: [`<span class="strong">${c.name}</span>`, `<span class="mono small">${c.id}</span>`, `<span class="num">${c.today}</span>`, `<span class="num">${c.rate}</span>`, badge(c.status),
-            `<button class="btn xs ghost" data-act="toast:Test sent on ${c.name}">Test</button>`]
+            `<button class="btn xs ghost" data-act="comms-test:${c.id}">Test</button>`]
           }))), { icon: "plug" })}
         <div class="grid cols-2">
           ${card("Tier gating", rowlist([
@@ -119,7 +119,7 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
           rowitem({ icon: "check", title: "SMS + segmentation", sub: "Professional ≤ 250", side: badge("active") }),
           rowitem({ icon: "lock", title: "Webhooks — LINE / WhatsApp / Teams", sub: "Enterprise ≤ 600", side: `<span class="badge plain">upgrade</span>`, neutral: 1 })
         ]), { icon: "layers" })}
-          ${card("Fallback policy", `<p class="small muted" style="margin-bottom:10px">Push first → SMS if unread after 4h — defined once, used by HR sends and automated notifications alike.</p><button class="btn sm ghost" data-act="toast:Fallback editor is a build-phase feature">${icon("settings")} Edit policy</button>`, { icon: "refresh" })}
+          ${card("Fallback policy", `<p class="small muted" style="margin-bottom:10px">Push first → SMS if unread after 4h — defined once, used by HR sends and automated notifications alike.</p><button class="btn sm ghost soon" title="Build-phase feature — not wired in this UI preview" data-act="toast:Fallback editor is a build-phase feature">${icon("settings")} Edit policy</button>`, { icon: "refresh" })}
         </div>`
       };
     },
@@ -128,7 +128,7 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
       const cap = (txt, tone) => `<span class="badge ${tone || ""} plain">${txt}</span>`;
       return {
         title: "Roles & permissions", sub: "The five-persona separation itself — every cell registers its capability row (socket: rbac); the kernel enforces scope.",
-        actions: `<button class="btn soft" data-act="toast:Role request approved — manager gains team reports scope (audit-logged)">${icon("check")} 1 request</button>`,
+        actions: `<button class="btn soft" data-act="wf-role-approve">${icon("check")} 1 request</button>`,
         body: `
         ${card("Capability matrix — module × persona", `<div class="tablewrap"><table class="tbl">
           <thead><tr><th>Module</th><th>Staff</th><th>Manager</th><th>HR</th><th>CEO</th><th>Sys Admin</th></tr></thead>
@@ -155,7 +155,7 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
     integrations() {
       return {
         title: "Integrations & SSO", sub: "Identity, exports and capture devices — every external surface, declared and monitored.",
-        actions: `<button class="btn" data-act="toast:Integration catalog — certified plug-ins register via module manifest (§06)">${icon("plus")} Add integration</button>`,
+        actions: `<button class="btn soon" title="Build-phase feature — not wired in this UI preview" data-act="toast:Integration catalog is a build-phase feature — certified plug-ins register via module manifest (§06)">${icon("plus")} Add integration</button>`,
         body: `
         ${card("Connected", rowlist([
           rowitem({ icon: "key", title: "Single sign-on — OIDC", sub: "id.phoungern.la · 99.4% success", side: badge("live") }),
@@ -333,7 +333,7 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
         title: tp.id, back: "sysadmin/mobile/templates", body: `
         ${card("", `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">${idtag(tp.id)}${badge(tp.status)}</div>
         <h3 style="font-size:16px;margin:10px 0 2px">${tp.name}</h3><div class="small muted">${tp.kind} · ${tp.lang} · v${tp.v}</div>`)}
-        ${tp.status !== "published" ? `<button class="btn" style="width:100%" data-act="toast:${tp.id} approved & published — audit-logged">${icon("check")} Approve & publish</button>` : ""}`
+        ${tp.status !== "published" ? `<button class="btn" style="width:100%" data-act="comms-publish-template:${tp.id}">${icon("check")} Approve & publish</button>` : ""}`
       };
     }
   };

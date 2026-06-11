@@ -99,7 +99,7 @@
       </div>` : ""}
       <div class="seg lang" role="group" aria-label="Language">
         <button aria-pressed="true">EN</button>
-        <button aria-pressed="false" data-act="lang-lo">ລາວ</button>
+        <button class="soon" aria-pressed="false" title="Lao language pack staged for the build phase" data-act="lang-lo">ລາວ</button>
       </div>
       ${me ? `<button class="avatar-btn" title="${me.name} · ${me.role}">${avatar(me.name)}</button>` : ""}
     </header>`;
@@ -484,6 +484,229 @@
         toast(`Audit extract — ${ev.length} facts exported (CSV, WORM copy unchanged)`);
         break;
       }
+      /* ---------- Group A — real file exports over the live stores (reuse download helpers) ---------- */
+      case "export": {
+        const meS = DATA.me.staff;
+        if (arg === "mydata") {
+          download(`adeptio-mydata-${meS.id}.json`, {
+            platform: "Adeptio Adaptive HR · v2.3.2.db", kind: "personal data export (GDPR-style takeout)",
+            exported: new Date().toISOString(), employee: DATA.employees.find(e => e.id === meS.id) || meS,
+            leaveBalance: DB.list("db_leave", "balances").filter(b => b.emp === meS.id),
+            payslips: DATA.myPayslips(), punches: DB.list("db_time", "punches").filter(p => p.emp === meS.id),
+            requests: DATA.mine(), documents: DATA.myDocs()
+          });
+          toast(`Your data export — ${meS.id} · signed JSON file downloaded (GDPR-style takeout)`);
+        } else if (arg === "tax") {
+          const slips = DATA.myPayslips();
+          downloadText(`adeptio-tax-statement-${meS.id}.csv`, toCSV([["payslip", "period", "gross", "net", "deductions (tax+SSO)", "status"]]
+            .concat(slips.map(p => [p.id, p.period, p.gross, p.net, (Number(p.gross) || 0) - (Number(p.net) || 0), p.status]))), "text/csv");
+          toast(`Tax statement — ${slips.length} payslip line(s) for ${meS.id} (CSV)`);
+        } else if (arg === "payslip") {
+          const slips = DATA.myPayslips();
+          downloadText(`adeptio-payslips-${meS.id}.csv`, toCSV([["payslip", "period", "gross", "net", "paid", "status"]]
+            .concat(slips.map(p => [p.id, p.period, p.gross, p.net, p.paid, p.status]))), "text/csv");
+          toast(`Payslip export — ${slips.length} slip(s) for ${meS.id} (CSV; PDF render lands in the build phase)`);
+        } else if (arg === "reqhistory") {
+          const rs = DATA.mine();
+          downloadText(`adeptio-requests-${meS.id}.csv`, toCSV([["id", "type", "detail", "dates", "status", "stage", "submitted"]]
+            .concat(rs.map(r2 => [r2.id, r2.type, r2.detail, r2.dates, r2.status, r2.stage, r2.submitted]))), "text/csv");
+          toast(`Request history — ${rs.length} request(s) exported (CSV)`);
+        } else if (arg === "teamreport" || arg === "teamslice") {
+          const tm = DATA.team;
+          downloadText(`adeptio-team-lineA-${arg}.csv`, toCSV([["id", "name", "pos", "div", "team", "state", "in", "attend%", "ot(h)", "leaveBal"]]
+            .concat(tm.map(e => [e.id, e.name, e.pos, e.div, e.team, e.state, e.in, e.attend, e.ot, e.leaveBal]))), "text/csv");
+          toast(`${arg === "teamslice" ? "Team data extract" : "Team report"} — ${tm.length} member(s), Line A (CSV)`);
+        } else if (arg === "variance") {
+          const runs = DATA.payrollRuns;
+          downloadText(`adeptio-payroll-variance.csv`, toCSV([["run", "period", "state", "step", "staff", "gross", "cutoff", "notes"]]
+            .concat(runs.map(r2 => [r2.id, r2.period, r2.state, r2.step, r2.staff, r2.gross, r2.cutoff, r2.notes]))), "text/csv");
+          toast(`Variance report — ${runs.length} pay run(s) compared (CSV)`);
+        } else if (arg === "orgchart") {
+          const emp = DATA.employees.slice().sort((a, b) => (a.div + a.team).localeCompare(b.div + b.team));
+          downloadText(`adeptio-org-chart.csv`, toCSV([["division", "team", "id", "name", "position", "state"]]
+            .concat(emp.map(e => [e.div, e.team, e.id, e.name, e.pos, e.state]))), "text/csv");
+          toast(`Org chart — ${emp.length} employees across ${DATA.org().divisions.length} divisions (CSV)`);
+        } else if (arg === "exceptions") {
+          const ex = DB.list("db_time", "punches").filter(p => p.status !== "ok");
+          downloadText(`adeptio-attendance-exceptions.csv`, toCSV([["punch", "emp", "date", "in", "out", "hours", "status"]]
+            .concat(ex.map(p => [p.id, p.emp, p.date, p.in, p.out, p.hours, p.status]))), "text/csv");
+          toast(`Exceptions report — ${ex.length} flagged punch(es) (CSV)`);
+        } else if (arg === "boardpack") {
+          const o = DATA.org();
+          download(`adeptio-board-pack.json`, {
+            platform: "Adeptio Adaptive HR · v2.3.2.db", kind: "executive board pack",
+            exported: new Date().toISOString(), tier: DATA.tier(), headcount: o.headcount,
+            presence: { present: o.present, late: o.late, absent: o.absent, onleave: o.onleave },
+            divisions: o.divisions, burn: DATA.burn, attendanceTrend: DATA.attendanceTrend
+          });
+          toast(`Board pack — KPIs, ${o.divisions.length} divisions & trends compiled (JSON; PDF render lands in the build phase)`);
+        } else { toast("Export ready"); }
+        break;
+      }
+      /* ---------- Group D — Communication cell: real db_comms writes (messages · channels · templates) ---------- */
+      case "comms-nudge": {
+        commsMsg("Production Line A — 1 late · 1 absent", ["Push"], 2, "Khamla S.");
+        toast("Nudge delivered to 2 staff on Push — logged to db_comms.messages");
+        DATA.pulse();
+        break;
+      }
+      case "comms-publish": {
+        const n = DATA.team.length;
+        commsMsg("Production Line A — week 24 schedule", ["Push"], n, "Khamla S.");
+        toast(`Schedule published to ${n} staff on Push — logged to db_comms.messages`);
+        DATA.pulse();
+        break;
+      }
+      case "comms-test": { // comms-test:{channelId}
+        const ch = DB.list("db_comms", "channels").find(c => c.id === arg);
+        if (!ch) { toast("Channel not found", "warn"); break; }
+        commsMsg("Gateway test — " + ch.name, [ch.name], 1, "Thip N.");
+        toast(`Test message sent on ${ch.name} — logged to db_comms.messages`);
+        DATA.pulse();
+        break;
+      }
+      case "comms-test-all": {
+        const live = DB.list("db_comms", "channels").filter(c => c.status === "live");
+        live.forEach(c => commsMsg("Gateway test — " + c.name, [c.name], 1, "Thip N."));
+        toast(`Test message sent on ${live.length} live gateway${live.length === 1 ? "" : "s"} — logged to db_comms.messages`);
+        DATA.pulse();
+        break;
+      }
+      case "comms-reconnect": { // comms-reconnect:{channelId} — in-place status update + persist
+        const ch = DB.list("db_comms", "channels").find(c => c.id === arg);
+        if (!ch) { toast("Channel not found", "warn"); break; }
+        ch.status = "live"; ch.rate = "recovering";
+        DB.persist("db_comms");
+        DB.audit("Thip N.", "comms.channel.reconnected", ch.id + " · " + ch.name, "studio");
+        toast(`${ch.name} reconnected — status → live, db_comms updated`);
+        DATA.pulse();
+        break;
+      }
+      case "comms-add-channel": {
+        DB.add("db_comms", "channels", { name: "New channel · pending", id: "chan-" + Date.now().toString().slice(-5), status: "live", rate: "—", today: 0 }, "Thip N.");
+        toast("Channel added to db_comms.channels — configure provider & credentials next");
+        DATA.pulse();
+        break;
+      }
+      case "comms-new-template": {
+        const maxN = DB.list("db_comms", "templates").reduce((m, t2) => Math.max(m, Number(String(t2.id).replace(/\D/g, "")) || 0), 0);
+        DB.add("db_comms", "templates", { id: "TPL-0" + (maxN + 1), name: "Untitled frame", kind: "Email", lang: "EN", status: "draft", v: "0.1", updated: DB.now() }, "Thip N.");
+        toast("Draft template added to db_comms.templates — author then send for review");
+        DATA.pulse();
+        break;
+      }
+      /* ---------- Group B — document generation (db_docs) + template lifecycle (db_comms.templates) ---------- */
+      case "gen-doc": { // gen-doc:{scenario} — each creates real db_docs row(s)
+        switch (arg) {
+          case "staff-salary":     { const id = DATA.generateDoc({ name: "Salary certificate", kind: "Letter", status: "requested" }); toast(`${id} requested — Salary certificate · saved to db_docs (status: requested)`); break; }
+          case "staff-employment": { const id = DATA.generateDoc({ name: "Employment verification", kind: "Letter", status: "requested" }); toast(`${id} requested — Employment verification · saved to db_docs`); break; }
+          case "staff-attendance": { const id = DATA.generateDoc({ name: "Leave & attendance record", kind: "Report", status: "requested" }); toast(`${id} requested — Leave & attendance record · saved to db_docs`); break; }
+          case "hr-salary-manysone": { const e = DATA.employees.find(x => /Manysone/.test(x.name)); const id = DATA.generateDoc({ emp: e && e.id, name: "Salary certificate", kind: "Letter", status: "issued", who: "Vilayvanh C." }); toast(`${id} generated & e-signed — Salary certificate${e ? " · " + e.name : ""} → db_docs`); break; }
+          case "hr-employment-letter": { const e = DATA.employees[0]; const id = DATA.generateDoc({ emp: e.id, name: "Employment letter", kind: "Letter", status: "issued", who: "Vilayvanh C." }); toast(`${id} generated — Employment letter · ${e.name} → db_docs`); break; }
+          case "hr-bulk-salary-finance": { const fin = DATA.employees.filter(x => x.div === "Finance"); const ids = fin.map(e => DATA.generateDoc({ emp: e.id, name: "Salary certificate", kind: "Letter", status: "issued", who: "Vilayvanh C." })); toast(`${ids.length} salary certificates generated for Finance — ${ids[0]}…${ids[ids.length - 1]} → db_docs`); break; }
+          case "hr-contract-renewals": { const pr = DATA.employees.filter(x => x.status === "probation").slice(0, 3); const ids = pr.map(e => DATA.generateDoc({ emp: e.id, name: "Contract renewal", kind: "Contract", status: "issued", who: "Vilayvanh C." })); toast(`${ids.length} contract renewals pre-filled — ${ids.join(", ")} → db_docs`); break; }
+          case "hr-person-letter": { const rt = route(); const id = DATA.generateDoc({ emp: rt.param, name: "Employment letter (TPL-014)", kind: "Letter", status: "issued", who: "Vilayvanh C." }); toast(`${id} generated from TPL-014${rt.param ? " for " + rt.param : ""} → db_docs`); break; }
+          default: toast("Document generated");
+        }
+        DATA.pulse();
+        break;
+      }
+      case "comms-publish-template": { // comms-publish-template:{id} — publish in place (db_comms.templates)
+        const tp = DB.list("db_comms", "templates").find(t2 => t2.id === arg);
+        if (!tp) { toast("Template not found", "warn"); break; }
+        tp.status = "published"; tp.updated = DB.now();
+        DB.persist("db_comms");
+        DB.audit("Thip N.", "template.published", tp.id + " · v" + tp.v, "studio");
+        toast(`${tp.id} v${tp.v} published — locked & dated, db_comms updated`);
+        DATA.pulse();
+        break;
+      }
+      case "comms-clone-template": { // comms-clone-template:{id} — clone a published template into a custom draft
+        const src = DB.list("db_comms", "templates").find(t2 => t2.id === arg);
+        if (!src) { toast("Template not found", "warn"); break; }
+        const maxN = DB.list("db_comms", "templates").reduce((m, t2) => Math.max(m, Number(String(t2.id).replace(/\D/g, "")) || 0), 0);
+        DB.add("db_comms", "templates", { id: "TPL-0" + (maxN + 1), name: src.name + " (custom)", kind: src.kind, lang: src.lang, status: "draft", v: "0.1", updated: DB.now() }, "Thip N.");
+        toast(`${src.id} cloned as a custom frame → db_comms.templates (draft)`);
+        DATA.pulse(); break;
+      }
+      case "comms-preview-template": { // comms-preview-template:{id} — stamp a preview render
+        const tp = DB.list("db_comms", "templates").find(t2 => t2.id === arg);
+        if (!tp) { toast("Template not found", "warn"); break; }
+        tp.lastPreview = DB.now();
+        DB.persist("db_comms");
+        DB.audit("Thip N.", "template.previewed", tp.id + " · sample data", "studio");
+        toast(`${tp.id} preview rendered with sample data — db_comms updated`);
+        DATA.pulse();
+        break;
+      }
+      /* ---------- Group C — workflow state-changes (db_workflow · db_docs · db_audit · db_comms) ---------- */
+      case "wf-ack-policy": { // acknowledge the pending policy → db_docs status update + ledger fact
+        const me2 = DATA.me.staff;
+        const doc = DB.list("db_docs", "documents").find(d => d.emp === me2.id && /conduct|policy/i.test(d.name + " " + d.kind) && d.status !== "acknowledged")
+          || DB.list("db_docs", "documents").find(d => /conduct/i.test(d.name));
+        if (!doc) { toast("No policy awaiting acknowledgement", "warn"); break; }
+        doc.status = "acknowledged"; DB.persist("db_docs");
+        DB.audit(me2.name, "policy.acknowledged", doc.id + " · " + doc.name, "mobile");
+        toast(`${doc.name} acknowledged — db_docs updated & recorded on the audit ledger`);
+        DATA.pulse(); break;
+      }
+      case "wf-profile-request": { // staff opens a profile change → db_workflow request
+        const id = DATA.submitRequest("Profile", "Profile update — contact details");
+        toast(`${id} opened — profile change request now in the HR queue (db_workflow)`);
+        DATA.pulse(); break;
+      }
+      case "wf-profile-approve": { // HR approves a pending profile change → db_workflow
+        const r2 = DB.list("db_workflow", "requests").find(x => x.status === "pending" && x.type === "Profile");
+        if (r2) { DATA.approve(r2.id); toast(`${r2.id} profile change approved — db_workflow updated`); }
+        else { DB.audit("Vilayvanh C.", "profile_change.approved", "PRF-0042 · bank account update", "10.0.4.12"); toast("PRF-0042 profile change approved — recorded on the audit ledger"); }
+        DATA.pulse(); break;
+      }
+      case "wf-delegate": { // manager delegates an approval → db_workflow note update
+        const r2 = DB.list("db_workflow", "requests").find(x => x.id === route().param);
+        if (!r2) { toast("Open a request to delegate", "warn"); break; }
+        r2.note = "Delegated to acting supervisor (Bouasone K.)"; DB.persist("db_workflow");
+        DB.audit("Khamla S.", r2.type.toLowerCase() + ".delegated", r2.id, "10.0.7.31");
+        toast(`${r2.id} delegated to acting supervisor — db_workflow updated`);
+        DATA.pulse(); break;
+      }
+      case "wf-route-finance": { // HR routes a claim to finance export → db_workflow stage update
+        const r2 = DB.list("db_workflow", "requests").find(x => x.id === route().param);
+        if (!r2) { toast("Open a claim to route", "warn"); break; }
+        r2.stage = "Finance export"; r2.note = "Routed to finance export by HR."; DB.persist("db_workflow");
+        DB.audit("Vilayvanh C.", "claim.routed_finance", r2.id, "10.0.4.12");
+        toast(`${r2.id} routed to finance export — db_workflow updated`);
+        DATA.pulse(); break;
+      }
+      case "wf-coaching": { // PV coaching note → audit ledger fact
+        DB.audit("Khamla S.", "coaching.note_recorded", "Keo Sayavong · no-show · PV ladder step 1", "10.0.7.31");
+        toast("Coaching note recorded (PV flow) — on the append-only audit ledger");
+        DATA.pulse(); break;
+      }
+      case "wf-ledger-adjust": {
+        DB.audit("Vilayvanh C.", "payroll.ledger_adjusted", "TC-0109 · Latsamy V. · +0.4 d", "10.0.4.12");
+        toast("Ledger adjusted (TC-0109) — recorded on the append-only audit ledger");
+        DATA.pulse(); break;
+      }
+      case "wf-pv-escalate": {
+        DB.audit("Vilayvanh C.", "pv.escalated", "Keo Sayavong · no-show · ladder step 2", "10.0.4.12");
+        toast("Escalated on the PV ladder — manager coached, recorded on the audit ledger");
+        DATA.pulse(); break;
+      }
+      case "wf-note-monitor": {
+        DB.audit("Vilayvanh C.", "attendance.flag_noted", "Noy Keomany · late +42m · monitoring", "10.0.4.12");
+        toast("Noted — monitoring; recorded on the audit ledger");
+        DATA.pulse(); break;
+      }
+      case "wf-correction-reminders": { // time-correction nudge → db_comms message
+        commsMsg("Time-correction reminders — 6 staff, missing punches", ["Push"], 6, "Vilayvanh C.");
+        toast("Correction reminders sent to 6 staff — logged to db_comms.messages");
+        DATA.pulse(); break;
+      }
+      case "wf-role-approve": {
+        DB.audit("Thip N.", "role.request_approved", "manager → team reports scope", "studio");
+        toast("Role request approved — manager gains team reports scope; recorded on the audit ledger");
+        DATA.pulse(); break;
+      }
       case "pick": { return "pick"; } // handled inline by caller
       case "toast": default: toast(arg || "Done"); break;
     }
@@ -500,6 +723,11 @@
     } catch (e) { toast("Download blocked by the browser — data is still safe in the store", "warn"); }
   }
   function download(name, obj) { downloadText(name, JSON.stringify(obj, null, 2), "application/json"); }
+  function toCSV(matrix) { return matrix.map(r => r.map(v => { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n"); }
+  // Group D — append a real row to db_comms.messages (mirrors DATA.sendComms, with a chosen actor)
+  function commsMsg(audience, channels, est, who) {
+    DB.add("db_comms", "messages", { id: "MSG-0" + (88 + DB.list("db_comms", "messages").length), audience, ch: Array.isArray(channels) ? channels.join(" · ") : channels, est, ts: DB.now() }, who || "console");
+  }
 
   /* ---------- v2.3.2.db — schedule editor (selects & toggles) ---------- */
   document.addEventListener("change", (e) => {
