@@ -238,6 +238,16 @@ window.DB = (function () {
   function key(id) { return NS + "db." + TENANT + "-" + id; }
   function persist(id) {
     try { LS.setItem(key(id), JSON.stringify({ v: SEED_VERSION, t: Date.now(), tables: data[id] })); } catch (e) { /* quota — demo keeps running in-memory */ }
+    try { if (window.TURSO && window.TURSO.enqueue) window.TURSO.enqueue(id); } catch (e) { /* cloud sync is optional */ }
+  }
+  /* cloud-sync hooks (js/turso-sync.js) — no-ops unless Turso is configured */
+  function localMeta(id) { try { const p = JSON.parse(LS.getItem(key(id)) || "null"); return p ? { v: p.v, t: p.t } : null; } catch (e) { return null; } }
+  function raw(id) { return data[id]; }
+  function hydrate(id, tables, t) {
+    if (!byId[id] || !tables) return false;
+    data[id] = tables;
+    try { LS.setItem(key(id), JSON.stringify({ v: SEED_VERSION, t: t || Date.now(), tables })); } catch (e) { /* quota */ }
+    return true; // note: hydrate persists WITHOUT enqueueing — a pull must never echo back as a push
   }
   function loadAll() {
     const sd = seeds();
@@ -434,6 +444,6 @@ window.DB = (function () {
     policy, setPolicy, regRow, audit, now, stamp,
     backups: { all: bkAll, now: backupNow, restore: backupRestore, remove: backupDelete, clear: backupClear },
     exportObj, tick, drill, rebuildReports,
-    persist
+    persist, localMeta, raw, hydrate
   };
 })();
