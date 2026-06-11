@@ -12,7 +12,7 @@
 window.DB = (function () {
   const TENANT = "phoungern";
   const NS = "adeptio.v232.";
-  const SEED_VERSION = 5; // v5: 32-staff pilot roster + live-derived org KPIs
+  const SEED_VERSION = 6; // v6: generated report runs (last-3 visible + file-storage archive)
 
   /* localStorage — with in-memory shim so tools/smoke.js (node) runs */
   let LS;
@@ -32,7 +32,7 @@ window.DB = (function () {
     { id: "db_comms",    name: "Communication",        layer: "L-OP",          profile: "high-volume",         writer: "Comms cell",    icon: "megaphone", priority: 4, tables: ["templates", "channels", "messages"], protection: "Delivery logs age out to L-CU — tolerant store, lowest restore priority." },
     { id: "db_docs",     name: "Documents Vault",      layer: "L-OP + L-CU",   profile: "PII · blob+meta",     writer: "Docs cell",     icon: "folder",    priority: 3, tables: ["documents"], gate: "vault",           protection: "Metadata here; files live in L-CU with bucket versioning — a DB restore never loses a file." },
     { id: "db_audit",    name: "Audit Ledger",         layer: "L-OP → L-CU",   profile: "immutable",           writer: "Event bus",     icon: "lock",      priority: 1, tables: ["events"], append: true,               protection: "Append-only · daily export to WORM (object-lock) bucket — even we cannot rewrite history." },
-    { id: "dw_reports",  name: "Reporting Warehouse",  layer: "L-DR",          profile: "derived",             writer: "Projector",     icon: "chart",     priority: 5, tables: ["org_snapshots", "series"], derived: true, protection: "Rebuilt from the event ledger on demand — backup is a convenience, replay is the guarantee." },
+    { id: "dw_reports",  name: "Reporting Warehouse",  layer: "L-DR",          profile: "derived",             writer: "Projector",     icon: "chart",     priority: 5, tables: ["org_snapshots", "series", "generated"], derived: true, protection: "Rebuilt from the event ledger on demand — backup is a convenience, replay is the guarantee." },
     { id: "db_platform", name: "Platform Registry",    layer: "L-OP · global", profile: "control plane",       writer: "Kernel",        icon: "settings",  priority: 1, tables: ["registry", "backup_policies", "drills"], global: true, protection: "The one global DB — longest PITR window + export every 6 h; it is the map to everything else." }
   ];
   const byId = {}; CATALOG.forEach(c => byId[c.id] = c);
@@ -207,7 +207,60 @@ window.DB = (function () {
             budget: [1.25, 1.25, 1.28, 1.28, 1.32, 1.40, 1.33, 1.33, 1.36, 1.38, 1.42, 1.45] },
           { id: "attendance_trend", values: [93.8, 94.6, 95.2, 94.1, 95.8, 96.0, 94.9, 95.5, 94.7, 95.1] },
           { id: "audit_pulse", values: [84, 96, 122, 141, 138, 156, 149, 171, 162, 178] }
-        ]
+        ],
+        // generated report runs — newest first. Last 3 per report stay visible in its
+        // section; older runs are archived into file storage (one folder per report).
+        generated: (function () {
+          const RUN = (id, report, persona, title, ts, query, kpis, rows, archived) =>
+            ({ id, report, persona, title, ts, tier: "essential", fmt: "CSV", query, kpis, rows, archived: !!archived });
+          const rosterRows = (p, l, a) => [["id", "name", "status", "attend_pct", "ot_h"],
+            ["EMP-0214", "Souksavanh Phommachanh", "present", 98, 6], ["EMP-0231", "Manysone Vongphachanh", "present", 96, 11],
+            ["EMP-0188", "Noy Keomany", l ? "late" : "present", 91, 3], ["EMP-0205", "Bounmy Latsavong", "present", 99, 14],
+            ["EMP-0172", "Somphone Inthavong", "onleave", 94, 2], ["EMP-0226", "Phetsamone Douangta", "present", 97, 8],
+            ["EMP-0240", "Chanthala Phimmasone", "present", 95, 5], ["EMP-0193", "Keo Sayavong", a ? "absent" : "present", 88, 9]];
+          return [
+            RUN("RPT-1010", "team-attendance", "manager", "Team attendance — June", "Jun 10 · 17:30",
+              "SELECT * FROM people_employees WHERE team='Line A'; punches WHERE status='flagged' — db_people · db_time",
+              [["Present", "6 / 8", "75.0% of roster"], ["Late", "1", "auto-flagged"], ["Absent", "1", "PV ladder"], ["On leave", "1", "approved"]],
+              rosterRows(6, 1, 1)),
+            RUN("RPT-1009", "attendance", "hr", "Attendance — org", "Jun 10 · 17:00",
+              "GROUP BY division ON people_employees; flagged punches; open TC — db_people · db_time · db_workflow",
+              [["Present", "29", "90.6% of 32"], ["Late", "1", "auto-flagged"], ["Absent", "1", "no-show"], ["On leave", "1", "approved"]],
+              [["division", "staff"], ["Production", 17], ["Sales", 4], ["Logistics", 4], ["Finance", 3], ["Admin", 4]]),
+            RUN("RPT-1008", "payroll", "hr", "Payroll — register & burn", "Jun 10 · 09:00",
+              "SELECT * FROM payroll_payroll_runs ORDER BY period DESC — db_payroll · dw_reports.series(burn)",
+              [["Current run", "PR-2026-06", "draft · step 1/4"], ["Staff in run", "32", "active headcount"], ["Gross (period)", "₭ 186M", "before PIT + SSO"], ["Payslips on file", "2", "serialized"]],
+              [["run", "period", "staff", "gross", "step", "state"], ["PR-2026-06", "June 2026", 248, "₭ 1.42B", 1, "draft"], ["PR-2026-05", "May 2026", 246, "₭ 1.39B", 4, "disbursed"], ["PR-2026-04", "April 2026", 243, "₭ 1.36B", 4, "disbursed"]]),
+            RUN("RPT-1007", "team-attendance", "manager", "Team attendance — June", "Jun 09 · 17:30",
+              "SELECT * FROM people_employees WHERE team='Line A'; punches WHERE status='flagged' — db_people · db_time",
+              [["Present", "7 / 8", "87.5% of roster"], ["Late", "0", "—"], ["Absent", "0", "—"], ["On leave", "1", "approved"]],
+              rosterRows(7, 0, 0)),
+            RUN("RPT-1006", "headcount", "hr", "People & headcount", "Jun 09 · 08:30",
+              "COUNT(*) GROUP BY division, status FROM people_employees — db_people",
+              [["Active staff", "32", "+2 MoM"], ["On probation", "3", "90-day reviews"], ["Joined 2026", "3", "new this year"], ["Teams", "2 lines", "+ plant-wide"]],
+              [["division", "staff"], ["Production", 17], ["Sales", 4], ["Logistics", 4], ["Finance", 3], ["Admin", 4]]),
+            RUN("RPT-1005", "team-attendance", "manager", "Team attendance — June", "Jun 08 · 17:30",
+              "SELECT * FROM people_employees WHERE team='Line A'; punches WHERE status='flagged' — db_people · db_time",
+              [["Present", "8 / 8", "100% of roster"], ["Late", "0", "—"], ["Absent", "0", "—"], ["On leave", "0", "—"]],
+              rosterRows(8, 0, 0)),
+            RUN("RPT-1004", "my-attendance", "staff", "My attendance", "Jun 08 · 08:00",
+              "SELECT * FROM time_punches WHERE emp='EMP-0214' — db_time",
+              [["Score", "98%", "trailing 90 days"], ["Punches", "6", "this period"], ["Flagged", "1", "Jun 05 missing in"], ["OT", "6 h", "MTD"]],
+              [["date", "in", "out", "hours", "status"], ["Tue, Jun 09", "08:28", "17:32", 8.1, "ok"], ["Mon, Jun 08", "08:31", "17:30", 8.0, "ok"], ["Fri, Jun 05", "—", "17:31", "—", "flagged"], ["Thu, Jun 04", "08:29", "19:40", 10.2, "ot"]]),
+            RUN("RPT-1003", "board-pack", "ceo", "Executive board pack", "Jun 08 · 07:00",
+              "Aggregates only: headcount, burn vs budget, open requests, data-layer posture — dw_reports · db_workflow · db_platform",
+              [["Headcount", "248", "+3 vs plan"], ["Payroll burn", "₭ 1.42B", "vs ₭ 1.45B budget"], ["Open requests", "3", "across chains"], ["Data layer", "10/10 stores", "snapshots held"]],
+              [["metric", "value"], ["headcount", 248], ["present_pct", "95.1%"], ["burn_actual_B", 1.42], ["burn_budget_B", 1.45], ["attrition_pct", 7.2]]),
+            RUN("RPT-1002", "team-attendance", "manager", "Team attendance — June", "Jun 07 · 17:30",
+              "SELECT * FROM people_employees WHERE team='Line A'; punches WHERE status='flagged' — db_people · db_time",
+              [["Present", "7 / 8", "87.5% of roster"], ["Late", "1", "auto-flagged"], ["Absent", "0", "—"], ["On leave", "0", "—"]],
+              rosterRows(7, 1, 0), true), // 4th run — already archived to file storage
+            RUN("RPT-1001", "audit-extract", "sysadmin", "Audit ledger extract", "Jun 07 · 02:00",
+              "SELECT * FROM audit_events ORDER BY ts DESC — db_audit (append-only, WORM copy)",
+              [["Facts", "6", "in extract window"], ["Anomalies", "0", "rule engine"], ["Actors", "5", "distinct"], ["WORM", "verified", "object-lock bucket"]],
+              [["time", "actor", "action", "object"], ["10:42", "Vilayvanh C.", "payroll.run.draft_created", "PR-2026-06"], ["10:18", "Khamla S.", "leave.approved", "LV-0476"], ["09:56", "Thip N.", "template.published", "TPL-019 v1.4"]])
+          ];
+        })()
       },
       db_platform: {
         registry: CATALOG.map(c => ({
@@ -414,6 +467,42 @@ window.DB = (function () {
     return d;
   }
 
+  /* ---------- generated report runs — dw_reports.generated ----------
+     The Projector (report engine) is the ONE writer of this table.
+     Retention rule: per report, the newest 3 runs stay visible in the
+     report section; older runs auto-archive into file storage (one
+     folder per report); beyond 12 they expire. ---------- */
+  const VISIBLE_RUNS = 3, MAX_RUNS = 12;
+  function reportRuns(reportId) {
+    const all = data.dw_reports.generated || (data.dw_reports.generated = []);
+    return reportId ? all.filter(r => r.report === reportId) : all;
+  }
+  function reportSave(run, who) {
+    const all = reportRuns();
+    all.unshift(run);
+    // retention per report: first 3 visible, rest archived, >12 expire
+    const mine = all.filter(r => r.report === run.report);
+    mine.forEach((r, i) => { r.archived = i >= VISIBLE_RUNS; });
+    mine.slice(MAX_RUNS).forEach(r => { const i = all.indexOf(r); if (i >= 0) all.splice(i, 1); });
+    persist("dw_reports");
+    audit(who || "system", "report.generated", run.id + " · " + run.report + " → reports/" + TENANT + "/" + run.report + "/", "projector");
+    return run;
+  }
+  function reportDelete(runId, who) {
+    const all = reportRuns();
+    const i = all.findIndex(r => r.id === runId);
+    if (i < 0) return false;
+    const r = all[i];
+    all.splice(i, 1);
+    persist("dw_reports");
+    audit(who || "system", "report.expired", runId + " · " + r.report, "retention");
+    return true;
+  }
+  function nextReportId() {
+    const n = reportRuns().reduce((m, r) => Math.max(m, Number(String(r.id).replace(/\D/g, "")) || 0), 1000);
+    return "RPT-" + (n + 1);
+  }
+
   /* ---------- dw_reports rebuild — B3 replay, demonstrated ---------- */
   function rebuildReports(who) {
     const pro = data.dw_reports.org_snapshots.find(s => s.tier === "professional");
@@ -443,6 +532,7 @@ window.DB = (function () {
     TENANT, CATALOG, list, add, del, reset, meta, rows, sizeKB, provisioned,
     policy, setPolicy, regRow, audit, now, stamp,
     backups: { all: bkAll, now: backupNow, restore: backupRestore, remove: backupDelete, clear: backupClear },
+    reports: { runs: reportRuns, save: reportSave, remove: reportDelete, nextId: nextReportId, VISIBLE: VISIBLE_RUNS },
     exportObj, tick, drill, rebuildReports,
     persist, localMeta, raw, hydrate
   };

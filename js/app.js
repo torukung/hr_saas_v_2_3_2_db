@@ -447,21 +447,59 @@
         DATA.pulse();
         break;
       }
+      /* ---------- v2.3.2.db — report runs (generate · view · download · expire) ---------- */
+      case "report-gen": { // query the live stores, save a run, open its view-only page
+        const run = REP.generate(arg);
+        if (!run) { toast("That report is tier-gated — flip the toggle to preview", "warn"); break; }
+        toast(`${run.id} generated — ${run.rows.length - 1} rows queried ${run.ts} · saved to ${REP.folder(arg)}`);
+        const r = route();
+        go(`${r.persona}/web/report-run/${run.id}`);
+        break;
+      }
+      case "report-dl": { // download a stored run as CSV (the file link)
+        const run = DB.reports.runs().find(x => x.id === arg);
+        if (!run) { toast("Run not found — it may have expired from storage", "warn"); break; }
+        const csv = run.rows.map(r => r.map(v => { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n");
+        downloadText(run.id + ".csv", csv, "text/csv");
+        DB.audit("system", "report.downloaded", run.id + " · " + run.report + ".csv", "reports");
+        toast(`${run.id}.csv — ${run.rows.length - 1} rows · snapshot of ${run.ts}`);
+        break;
+      }
+      case "report-json": { // full stored payload (KPIs + query + rows)
+        const run = DB.reports.runs().find(x => x.id === arg);
+        if (!run) break;
+        download(run.id + ".json", run);
+        toast(`${run.id}.json downloaded — full payload`);
+        break;
+      }
+      case "report-rm": { // expire a file from storage
+        if (DB.reports.remove(arg, "Thip N.")) { toast(arg + " expired from file storage (retention)", "warn"); DATA.pulse(); }
+        break;
+      }
+      case "audit-dl": { // append-only ledger extract (CSV)
+        const ev = DB.list("db_audit", "events");
+        const csv = [["time", "actor", "action", "object", "origin"]].concat(ev.map(a => [a.ts, a.who, a.act, a.obj, a.ip]))
+          .map(r => r.map(v => { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n");
+        downloadText("adeptio-audit-extract.csv", csv, "text/csv");
+        toast(`Audit extract — ${ev.length} facts exported (CSV, WORM copy unchanged)`);
+        break;
+      }
       case "pick": { return "pick"; } // handled inline by caller
       case "toast": default: toast(arg || "Done"); break;
     }
   }
 
-  /* ---------- v2.3.2.db — file download helper ---------- */
-  function download(name, obj) {
+  /* ---------- v2.3.2.db — file download helpers ---------- */
+  function downloadText(name, text, mime) {
     try {
-      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+      const blob = new Blob([text], { type: mime || "text/plain" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob); a.download = name;
       document.body.appendChild(a); a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
     } catch (e) { toast("Download blocked by the browser — data is still safe in the store", "warn"); }
   }
+  function download(name, obj) { downloadText(name, JSON.stringify(obj, null, 2), "application/json"); }
 
   /* ---------- v2.3.2.db — schedule editor (selects & toggles) ---------- */
   document.addEventListener("change", (e) => {
