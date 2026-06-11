@@ -218,16 +218,30 @@
 
     reports() {
       return {
-        title: "Team reports", sub: "Scoped to your team by RBAC — same report library HR uses, narrower lens.",
-        body: `
-        <div class="grid cols-3">
-          ${["Team attendance — June", "OT summary — June", "Leave calendar — Q3"].map((r, i) => card(r, `
-            <p class="small muted" style="margin-bottom:12px">${["Daily present / late / absent matrix.", "Hours by member vs cap, cost preview.", "Approved + pending leave, conflict view."][i]}</p>
-            <div style="display:flex;gap:8px">
-              <button class="btn sm soft" data-act="toast:${r} — generated (PDF)">${icon("eye")} Preview</button>
-              ${DATA.has("scheduledReports") ? `<button class="btn sm ghost" data-act="toast:${r} — scheduled monthly to your inbox">${icon("send")} Schedule</button>` : UI.lockBtn("Schedule", DATA.unlockLabel("scheduledReports"))}
-            </div>`, { icon: "chart" })).join("")}
-        </div>`
+        title: "Team reports", sub: "Each section keeps its last 3 generated runs with query detail — click a run to view (read-only) or use its download link. Older runs move to file storage.",
+        actions: `<button class="btn ghost" data-go="manager/web/report-files">${icon("folder")} File storage</button>`,
+        body: REP.library("manager", "manager/web")
+      };
+    },
+
+    /* ---------- v2.3.2.db — run viewer (view-only snapshot + download link) ---------- */
+    "report-run"(param) {
+      const p = REP.runPage(param, "manager", "manager/web");
+      return {
+        title: p.title, sub: p.sub,
+        crumbs: [{ label: "Reports", go: "manager/web/reports" }, { label: p.run ? p.run.id : "run" }],
+        actions: p.run ? `${idtag(p.run.id)} ${p.run.archived ? `<span class="badge plain">archived</span>` : `<span class="badge ok plain">recent</span>`}` : "",
+        body: p.body
+      };
+    },
+
+    /* ---------- v2.3.2.db — file storage (archive, one folder per report) ---------- */
+    "report-files"() {
+      const f = REP.filesPage("manager", "manager/web");
+      return {
+        title: "Report file storage", sub: "Runs older than the last 3 are hidden here — one folder per report, view-only with download links. Retention expires files beyond 12 per report.",
+        crumbs: [{ label: "Reports", go: "manager/web/reports" }, { label: "File storage" }],
+        body: f.kpis + f.folders
       };
     }
   };
@@ -308,7 +322,7 @@
         { id: "teamdata", icon: "layers", label: "Team data" }
       ]}
     ],
-    parent: { approval: "approvals", member: "team" },
+    parent: { approval: "approvals", member: "team", "report-run": "reports", "report-files": "reports" },
     tabs: [
       { id: "home", icon: "home", label: "Home" },
       { id: "approvals", icon: "inbox", label: "Approvals" },

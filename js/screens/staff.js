@@ -339,6 +339,32 @@
       };
     },
 
+    /* ---------- v2.3.2.db — my reports (runs + file storage) ---------- */
+    reports() {
+      return {
+        title: "My reports", sub: "Statements over your own rows only — each section keeps its last 3 runs; click a run to view (read-only) or download. Older runs move to file storage.",
+        actions: `${userPicker()}<button class="btn ghost" data-go="staff/web/report-files">${icon("folder")} File storage</button>`,
+        body: REP.library("staff", "staff/web")
+      };
+    },
+    "report-run"(param) {
+      const p = REP.runPage(param, "staff", "staff/web");
+      return {
+        title: p.title, sub: p.sub,
+        crumbs: [{ label: "My reports", go: "staff/web/reports" }, { label: p.run ? p.run.id : "run" }],
+        actions: p.run ? `${idtag(p.run.id)} ${p.run.archived ? `<span class="badge plain">archived</span>` : `<span class="badge ok plain">recent</span>`}` : "",
+        body: p.body
+      };
+    },
+    "report-files"() {
+      const f = REP.filesPage("staff", "staff/web");
+      return {
+        title: "Report file storage", sub: "Runs older than the last 3 live here — one folder per report, view-only with download links.",
+        crumbs: [{ label: "My reports", go: "staff/web/reports" }, { label: "File storage" }],
+        body: f.kpis + f.folders
+      };
+    },
+
     me() {
       const m = DATA.me.staff;
       return {
@@ -465,14 +491,15 @@
       ]},
       { group: "Pay & docs", items: [
         { id: "payslips", icon: "banknote", label: t("staff.payslips") },
-        { id: "documents", icon: "folder", label: t("staff.documents"), lock: "vault" }
+        { id: "documents", icon: "folder", label: t("staff.documents"), lock: "vault" },
+        { id: "reports", icon: "chart", label: "My reports" }
       ]},
       { group: "Account", items: [
         { id: "me", icon: "user", label: t("staff.me") },
         { id: "mydata", icon: "layers", label: "My data" }
       ] }
     ],
-    parent: { "request-new": "requests", "request-detail": "requests", "payslip": "payslips" },
+    parent: { "request-new": "requests", "request-detail": "requests", "payslip": "payslips", "report-run": "reports", "report-files": "reports" },
     tabs: [
       { id: "home", icon: "home", label: "Home" },
       { id: "time", icon: "clock", label: "Time" },

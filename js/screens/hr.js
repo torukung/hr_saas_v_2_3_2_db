@@ -448,31 +448,31 @@
     },
 
     reports() {
-      const lib = [
-        ["Attendance", "Daily / period · late & absence · OT · by site", "PDF · XLSX · CSV"],
-        ["Leave", "Balances · liability · calendar · accrual", "PDF · XLSX"],
-        ["Payroll", "Register · pay-code · tax & social security", "PDF · XLSX · bank"],
-        ["People & headcount", "Roster · movement · tenure · cost", "PDF · XLSX"],
-        ["Compliance", "Policy ack · audit · doc expiry · exceptions", "PDF · CSV"],
-        ["Executive", "Board pack — cost · attrition · burn vs budget", "PDF · deck"]
-      ];
       return {
-        title: "Reports", sub: "Role-scoped, schedulable, export-ready — every cell registers its pack here (socket: outputs).",
-        body: `<div class="grid cols-3">${lib.map(r => {
-          const execLocked = r[0] === "Executive" && !DATA.has("execPack");
-          if (execLocked) return card(r[0], `
-          <p class="small muted" style="margin-bottom:10px">${r[1]}</p>
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-            <span class="small mono muted">${r[2]}</span>${UI.lockTag(DATA.unlockLabel("execPack"))}
-          </div>`, { icon: "lock", cls: "row-locked" });
-          return card(r[0], `
-          <p class="small muted" style="margin-bottom:10px">${r[1]}</p>
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-            <span class="small mono muted">${r[2]}</span>
-            <span style="display:flex;gap:7px"><button class="btn xs soft" data-act="toast:${r[0]} report — generated">Run</button>
-            ${DATA.has("scheduledReports") ? `<button class="btn xs ghost" data-act="toast:${r[0]} — scheduled monthly">Schedule</button>` : `<button class="btn xs ghost locked" data-act="${UI.lockMsg("Scheduled reports", DATA.unlockLabel("scheduledReports"))}">${icon("lock")} Schedule</button>`}</span>
-          </div>`, { icon: "chart" });
-        }).join("")}</div>`
+        title: "Reports", sub: "Each section keeps its last 3 generated runs with query detail — click a run to view (read-only) or use its download link. Older runs move to file storage, one folder per report.",
+        actions: `<button class="btn ghost" data-go="hr/web/report-files">${icon("folder")} File storage</button>`,
+        body: REP.library("hr", "hr/web")
+      };
+    },
+
+    /* ---------- v2.3.2.db — run viewer (view-only snapshot + download link) ---------- */
+    "report-run"(param) {
+      const p = REP.runPage(param, "hr", "hr/web");
+      return {
+        title: p.title, sub: p.sub,
+        crumbs: [{ label: "Reports", go: "hr/web/reports" }, { label: p.run ? p.run.id : "run" }],
+        actions: p.run ? `${idtag(p.run.id)} ${p.run.archived ? `<span class="badge plain">archived</span>` : `<span class="badge ok plain">recent</span>`}` : "",
+        body: p.body
+      };
+    },
+
+    /* ---------- v2.3.2.db — file storage (archive, one folder per report) ---------- */
+    "report-files"() {
+      const f = REP.filesPage("hr", "hr/web");
+      return {
+        title: "Report file storage", sub: "Runs older than the last 3 are hidden here — one folder per report, view-only with download links. Retention expires files beyond 12 per report.",
+        crumbs: [{ label: "Reports", go: "hr/web/reports" }, { label: "File storage" }],
+        body: f.kpis + f.folders
       };
     }
   };
@@ -539,7 +539,7 @@
       { group: "Insight", items: [{ id: "reports", icon: "chart", label: t("hr.reports") }] },
       { group: "Data", items: [{ id: "data", icon: "layers", label: "Data manager" }] }
     ],
-    parent: { approval: "approvals", person: "people", "person-new": "people", "payroll-run": "payroll" },
+    parent: { approval: "approvals", person: "people", "person-new": "people", "payroll-run": "payroll", "report-run": "reports", "report-files": "reports" },
     tabs: [
       { id: "queue", icon: "inbox", label: "Queue", lock: "l2" },
       { id: "alerts", icon: "bell", label: "Alerts" },

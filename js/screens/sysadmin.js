@@ -233,6 +233,32 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
       };
     },
 
+    /* ---------- v2.3.2.db — platform reports (runs + file storage) ---------- */
+    reports() {
+      return {
+        title: "Platform reports", sub: "Ledger extracts and resilience posture — each section keeps its last 3 runs; click a run to view (read-only) or download. Older runs move to file storage.",
+        actions: `<button class="btn ghost" data-go="sysadmin/web/report-files">${icon("folder")} File storage</button>`,
+        body: REP.library("sysadmin", "sysadmin/web")
+      };
+    },
+    "report-run"(param) {
+      const p = REP.runPage(param, "sysadmin", "sysadmin/web");
+      return {
+        title: p.title, sub: p.sub,
+        crumbs: [{ label: "Platform reports", go: "sysadmin/web/reports" }, { label: p.run ? p.run.id : "run" }],
+        actions: p.run ? `${idtag(p.run.id)} ${p.run.archived ? `<span class="badge plain">archived</span>` : `<span class="badge ok plain">recent</span>`}` : "",
+        body: p.body
+      };
+    },
+    "report-files"() {
+      const f = REP.filesPage("sysadmin", "sysadmin/web");
+      return {
+        title: "Report file storage", sub: "Runs older than the last 3 are hidden here — one folder per report, view-only with download links.",
+        crumbs: [{ label: "Platform reports", go: "sysadmin/web/reports" }, { label: "File storage" }],
+        body: f.kpis + f.folders
+      };
+    },
+
     /* ---------- v2.3.2.db — Backup center ---------- */
     backups() {
       const bc = DBV.backupCenter();
@@ -257,7 +283,7 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
     audit() {
       return {
         title: "Audit log", sub: "Append-only — every change, who and when. The event bus persists here (db_audit).",
-        actions: `<button class="btn ghost" data-act="toast:Audit extract exported (CSV, signed)">${icon("download")} ${t("common.export")}</button>`,
+        actions: `<button class="btn ghost" data-act="audit-dl">${icon("download")} ${t("common.export")}</button>`,
         body: `
         <div class="grid cols-3">
           ${kpi("Events today", "1,204", "live tail below", { hero: 1 })}
@@ -324,7 +350,8 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
       ]},
       { group: "Data layer", items: [
         { id: "database", icon: "grid", label: "Database studio" },
-        { id: "backups", icon: "download", label: "Backups & restore", count: () => DB.backups.all().length }
+        { id: "backups", icon: "download", label: "Backups & restore", count: () => DB.backups.all().length },
+        { id: "reports", icon: "chart", label: "Platform reports" }
       ]},
       { group: "Security", items: [
         { id: "roles", icon: "key", label: t("sys.roles") },
@@ -332,7 +359,7 @@ ${tp.kind.includes("SMS") ? "Shift reminder: {{shift_date}} {{shift_time}} at {{
         { id: "audit", icon: "lock", label: t("sys.audit") }
       ]}
     ],
-    parent: { template: "templates", dbstore: "database" },
+    parent: { template: "templates", dbstore: "database", "report-run": "reports", "report-files": "reports" },
     tabs: [
       { id: "health", icon: "pulse", label: "Health" },
       { id: "templates", icon: "files", label: "Templates" },

@@ -161,16 +161,29 @@
 
     packs() {
       return {
-        title: "Board packs", sub: "Auto-compiled each period from the executive report pack — delivered, archived, exportable.",
-        actions: ro,
-        body: card("Library", table(
-          [{ h: "Pack" }, { h: "Period" }, { h: "Compiled" }, { h: "", r: 1 }],
-          [
-            { cells: [`<span class="strong">Executive board pack</span> ${idtag("BP-2026-Q2")}`, "Q2 2026 · to date", "auto · Jun 08", `<button class="btn xs soft" data-act="toast:BP-2026-Q2 exported (PDF · deck)">${t("common.export")}</button>`] },
-            { cells: [`Executive board pack ${idtag("BP-2026-Q1")}`, "Q1 2026", "Apr 02", `<button class="btn xs ghost" data-act="toast:BP-2026-Q1 exported">${t("common.export")}</button>`] },
-            { cells: [`Annual workforce review ${idtag("BP-2025-FY")}`, "FY 2025", "Jan 15", `<button class="btn xs ghost" data-act="toast:BP-2025-FY exported">${t("common.export")}</button>`] }
-          ]), { icon: "files" }) +
+        title: "Board packs", sub: "Compiled from aggregates on demand — each pack keeps its last 3 runs with query detail; click a run to view (read-only) or download. Older runs move to file storage.",
+        actions: `${ro}<button class="btn ghost" data-go="ceo/web/report-files">${icon("folder")} File storage</button>`,
+        body: REP.library("ceo", "ceo/web") +
           card("Schedule", `<p class="small muted" style="margin-bottom:10px">Compiled monthly on the 1st, quarterly on close — delivered to the board via email channel.</p><button class="btn ghost sm" data-act="toast:Delivery schedule is owned by HR/SysAdmin — request sent">${icon("send")} Request a change</button>`, { icon: "calendar" })
+      };
+    },
+
+    "report-run"(param) {
+      const p = REP.runPage(param, "ceo", "ceo/web");
+      return {
+        title: p.title, sub: p.sub,
+        crumbs: [{ label: "Board packs", go: "ceo/web/packs" }, { label: p.run ? p.run.id : "run" }],
+        actions: p.run ? `${idtag(p.run.id)} ${ro}` : ro,
+        body: p.body
+      };
+    },
+    "report-files"() {
+      const f = REP.filesPage("ceo", "ceo/web");
+      return {
+        title: "Pack file storage", sub: "Packs older than the last 3 are hidden here — one folder per pack, view-only with download links.",
+        crumbs: [{ label: "Board packs", go: "ceo/web/packs" }, { label: "File storage" }],
+        actions: ro,
+        body: f.kpis + f.folders
       };
     }
   };
@@ -226,7 +239,7 @@
         { id: "dataroom", icon: "layers", label: "Data room" }
       ]}
     ],
-    parent: { division: "divisions" },
+    parent: { division: "divisions", "report-run": "packs", "report-files": "packs" },
     tabs: [
       { id: "board", icon: "grid", label: "Board" },
       { id: "trends", icon: "trend", label: "Trends" },
