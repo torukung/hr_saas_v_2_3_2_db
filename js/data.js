@@ -17,14 +17,41 @@ window.DATA = (function () {
     get divisions() { return DB.list("db_people", "divisions"); }
   };
 
-  // Who you are, per persona lens
+  // Who you are, per persona lens.
+  // v2.3.2.db: the STAFF lens is no longer hard-coded — it reads the acting
+  // user from db_people, switchable from any Staff screen (and persisted).
+  // New hires are selectable the moment their row lands in the store.
+  const ME_KEY = "adeptio.v232.actingStaff";
+  let actingStaffId = "EMP-0214";
+  try { if (typeof localStorage !== "undefined" && localStorage.getItem(ME_KEY)) actingStaffId = localStorage.getItem(ME_KEY); } catch (e) { /* node / blocked storage */ }
+
+  function actingStaff() {
+    const emp = DB.list("db_people", "employees");
+    const e = emp.find(x => x.id === actingStaffId) || emp.find(x => x.id === "EMP-0214") || emp[0];
+    if (!e) return { name: "No staff on file", id: "—", role: "—", site: "Vientiane Plant 1", attend: 0, leaveBal: 0, ot: 0, div: "—", team: "—", pos: "—", since: "—" };
+    return {
+      name: e.name, id: e.id, site: "Vientiane Plant 1",
+      role: e.pos + " · " + e.div + (e.team && e.team !== "—" ? " " + e.team : ""),
+      attend: e.attend, leaveBal: e.leaveBal, ot: e.ot,
+      div: e.div, team: e.team, pos: e.pos, since: e.since, status: e.status || "active"
+    };
+  }
+  const shortName = (n) => { const p = String(n).split(" "); return p[0] + (p[1] ? " " + p[1][0] + "." : ""); };
+
   const me = {
-    staff:    { name: "Souksavanh Phommachanh", id: "EMP-0214", role: "Machine Operator · Production Line A", site: "Vientiane Plant 1" },
+    get staff() { return actingStaff(); },
     manager:  { name: "Khamla Sisouphanh",      id: "EMP-0098", role: "Supervisor · Production Line A", team: "Production Line A" },
     hr:       { name: "Vilayvanh Chanthavong",  id: "EMP-0021", role: "HR Operations Lead" },
     ceo:      { name: "Phonesavanh Luangrath",  id: "EMP-0001", role: "Chief Executive · Shareholder" },
     sysadmin: { name: "Thip Norasing",          id: "ADM-0002", role: "Platform Administrator" }
   };
+
+  function setActingStaff(id) {
+    actingStaffId = id;
+    try { if (typeof localStorage !== "undefined") localStorage.setItem(ME_KEY, id); } catch (e) {}
+    DB.audit("system", "session.staff_lens", id + " · " + actingStaff().name, "demo");
+    notify();
+  }
 
   /* ---------- live state (UI-session state; records live in DB) ---------- */
   const state = {
@@ -108,23 +135,59 @@ window.DATA = (function () {
   function clock() {
     state.clockedIn = !state.clockedIn;
     const punches = DB.list("db_time", "punches");
+    const who = shortName(me.staff.name);
     if (state.clockedIn) {
       state.clockIn = DB.now();
-      DB.add("db_time", "punches", { id: "PN-" + Date.now().toString().slice(-4), emp: me.staff.id, date: "Wed, Jun 10", in: state.clockIn, out: "—", hours: "—", status: "ok" }, "Souksavanh P.");
+      DB.add("db_time", "punches", { id: "PN-" + Date.now().toString().slice(-4), emp: me.staff.id, date: "Wed, Jun 10", in: state.clockIn, out: "—", hours: "—", status: "ok" }, who);
     } else {
       const open = punches.find(p => p.emp === me.staff.id && p.out === "—");
       if (open) { open.out = DB.now(); DB.persist("db_time"); }
     }
-    DB.audit("Souksavanh P.", state.clockedIn ? "attendance.punch_in" : "attendance.punch_out", me.staff.id + " · GPS", "mobile");
+    DB.audit(who, state.clockedIn ? "attendance.punch_in" : "attendance.punch_out", me.staff.id + " · GPS", "mobile");
     notify();
   }
   function submitRequest(type, detail) {
     const prefix = { Leave: "LV", Overtime: "OT", Claim: "EX", Correction: "TC" }[type] || "RQ";
     const id = prefix + "-0" + (483 + DB.list("db_workflow", "requests").length);
-    DB.add("db_workflow", "requests", { id, type, who: me.staff.name, detail, dates: "Jun 2026", status: "pending", stage: "L1 · Manager", sla: "48h", note: "Submitted from UI preview.", submitted: "Jun 10 · " + DB.now() }, "Souksavanh P.");
+    DB.add("db_workflow", "requests", { id, type, who: me.staff.name, detail, dates: "Jun 2026", status: "pending", stage: "L1 · Manager", sla: "48h", note: "Submitted from UI preview.", submitted: "Jun 10 · " + DB.now() }, shortName(me.staff.name));
     notify();
     return id;
   }
+
+  /* ---------- staff lifecycle — used by the UI actions AND the smoke test ---------- */
+  function hireStaff(f) {
+    const emp = DB.list("db_people", "employees");
+    const next = emp.reduce((m, e) => Math.max(m, Number(String(e.id).replace(/\D/g, "")) || 0), 0) + 1;
+    const id = "EMP-" + String(next).padStart(4, "0");
+    DB.add("db_people", "employees", {
+      id, name: f.name, pos: f.pos || "Staff", div: f.div || "Production", team: f.team || "—",
+      state: "present", in: DB.now(), attend: 100, ot: 0, leaveBal: 15, since: "Jun 2026", status: "probation"
+    }, "Vilayvanh C.");
+    DB.audit("Vilayvanh C.", "employee.hired", id + " · " + f.name, "10.0.4.12");
+    // the Leave cell reacts to the employee.hired fact (§05 event chain, simulated):
+    DB.add("db_leave", "balances", { emp: id, name: shortName(f.name), annual: 15, sick: 30, taken: 0 }, "system");
+    notify();
+    return id;
+  }
+  function offboardStaff(id) {
+    const e = DB.list("db_people", "employees").find(x => x.id === id);
+    DB.del("db_people", "employees", "id", id, "Vilayvanh C.");
+    DB.del("db_leave", "balances", "emp", id, "system");
+    DB.audit("Vilayvanh C.", "employee.offboarded", id + (e ? " · " + e.name : ""), "10.0.4.12");
+    if (actingStaffId === id) setActingStaff("EMP-0214"); else notify();
+  }
+  function reassignStaff(id, div, team, who) {
+    const e = DB.list("db_people", "employees").find(x => x.id === id);
+    if (!e) return false;
+    if (div) e.div = div;
+    if (team) e.team = team;
+    DB.persist("db_people");
+    DB.audit(who || "Vilayvanh C.", "employee.reassigned", `${id} → ${e.div} · team ${e.team}`, who === "Khamla S." ? "10.0.7.31" : "10.0.4.12");
+    notify();
+    return true;
+  }
+  const myPayslips = () => DB.list("db_payroll", "payslips").filter(p => p.emp === me.staff.id);
+  const myDocs = () => DB.list("db_docs", "documents").filter(d => d.emp === me.staff.id);
   function advanceRun(id) {
     const r = DB.list("db_payroll", "payroll_runs").find(x => x.id === id);
     if (!r || r.step >= 4) return;
@@ -164,7 +227,9 @@ window.DATA = (function () {
     get attendanceTrend()   { return series("attendance_trend").values; },
     get sent()              { return DB.list("db_comms", "messages"); },
     approve, ret, clock, submitRequest, advanceRun, sendComms,
-    pendingL1, pendingL2, mine,
+    pendingL1, pendingL2, mine, myPayslips, myDocs,
+    hireStaff, offboardStaff, reassignStaff,
+    setActingStaff, actingStaffId: () => actingStaffId,
     has, unlockLabel, setTier, org,
     tier: () => state.tier,
     pulse: notify,

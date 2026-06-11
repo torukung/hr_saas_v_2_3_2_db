@@ -319,48 +319,29 @@
         const val = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
         const name = val("st-name");
         if (!name) { toast("Give the new hire a name first", "warn"); break; }
-        const emp = DB.list("db_people", "employees");
-        const next = emp.reduce((m, e) => Math.max(m, Number(String(e.id).replace(/\D/g, "")) || 0), 0) + 1;
-        const id = "EMP-" + String(next).padStart(4, "0");
-        DB.add("db_people", "employees", {
-          id, name, pos: val("st-pos") || "Staff", div: val("st-div") || "Production", team: val("st-team") || "—",
-          state: "present", in: DB.now(), attend: 100, ot: 0, leaveBal: 15, since: "Jun 2026", status: "probation"
-        }, "Vilayvanh C.");
-        DB.audit("Vilayvanh C.", "employee.hired", id + " · " + name, "10.0.4.12");
-        toast(`${id} · ${name} created in db_people — probation, org KPIs re-derived`);
+        const id = DATA.hireStaff({ name, pos: val("st-pos"), div: val("st-div"), team: val("st-team") });
+        toast(`${id} · ${name} created in db_people — selectable as a Staff user right away`);
         go("hr/web/person/" + id);
         break;
       }
       case "staff-del": { // Offboard & remove (person detail)
-        const emp = DB.list("db_people", "employees").find(e => e.id === arg);
-        DB.del("db_people", "employees", "id", arg, "Vilayvanh C.");
-        DB.audit("Vilayvanh C.", "employee.offboarded", arg + (emp ? " · " + emp.name : ""), "10.0.4.12");
+        DATA.offboardStaff(arg);
         toast(`${arg} offboarded — record exported & removed, headcount re-derived`, "warn");
         go("hr/web/people");
         break;
       }
       case "staff-assign": { // Reassign division/team (person detail)
-        const emp = DB.list("db_people", "employees").find(e => e.id === arg);
-        if (!emp) break;
         const dv = document.getElementById("as-div"), tm = document.getElementById("as-team");
-        if (dv) emp.div = dv.value;
-        if (tm) emp.team = tm.value;
-        DB.persist("db_people");
-        DB.audit("Vilayvanh C.", "employee.reassigned", `${arg} → ${emp.div} · team ${emp.team}`, "10.0.4.12");
-        toast(`${arg} reassigned → ${emp.div}${emp.team !== "—" ? " · " + emp.team : ""} — every lens updated`);
-        DATA.pulse();
+        if (DATA.reassignStaff(arg, dv && dv.value, tm && tm.value)) {
+          toast(`${arg} reassigned — every lens updated on the same write`);
+        }
         break;
       }
       case "mgr-assign": { // Manager: pull an existing employee onto Line A
         const sel = document.getElementById("mg-assign");
         if (!sel || !sel.value) { toast("Pick a staff member to assign", "warn"); break; }
-        const emp = DB.list("db_people", "employees").find(e => e.id === sel.value);
-        if (!emp) break;
-        emp.team = "Line A";
-        DB.persist("db_people");
-        DB.audit("Khamla S.", "employee.team_assigned", `${emp.id} · ${emp.name} → Line A`, "10.0.7.31");
-        toast(`${emp.name} assigned to Line A — now on your roster, board and schedule`);
-        DATA.pulse();
+        DATA.reassignStaff(sel.value, null, "Line A", "Khamla S.");
+        toast(`${sel.value} assigned to Line A — now on your roster, board and schedule`);
         break;
       }
       /* ---------- v2.3.2.db — database management actions ---------- */
@@ -484,6 +465,8 @@
 
   /* ---------- v2.3.2.db — schedule editor (selects & toggles) ---------- */
   document.addEventListener("change", (e) => {
+    const sp = e.target.closest(".staff-pick"); // v2.3.2.db — switch the acting Staff user (any row in db_people)
+    if (sp) { DATA.setActingStaff(sp.value); toast(`Staff lens → ${DATA.me.staff.name} — requests, payslips, punches & documents now read their rows`); return; }
     const f = e.target.closest(".sc-freq");
     if (f) { DB.setPolicy(f.getAttribute("data-store"), { freq: f.value, last: null }, "Thip N."); toast(`${f.getAttribute("data-store")} → ${f.value} exports · runs on the next scheduler tick`); DATA.pulse(); return; }
     const o = e.target.closest(".sc-on");

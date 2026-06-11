@@ -9,6 +9,19 @@
 
   const statusBadge = (r) => badge(r.status);
 
+  /* v2.3.2.db — acting-user picker: ANY row of db_people can drive this lens.
+     New hires appear here the moment HR creates them. */
+  function userPicker() {
+    const cur = DATA.me.staff.id;
+    return `<select class="input sm staff-pick" title="Demo — act as any user from db_people" aria-label="Acting staff user">
+      ${DATA.employees.map(e => `<option value="${e.id}" ${e.id === cur ? "selected" : ""}>${e.name} · ${e.id}</option>`).join("")}</select>`;
+  }
+  function userPickerCard() {
+    return card("Acting as — pick a user from db_people", `
+      ${userPicker()}
+      <p class="small muted" style="margin-top:10px">${DATA.me.staff.status === "probation" ? `<span class="badge warn plain">probation</span> ` : ""}Every Staff screen — requests, payslips, punches, documents, KPIs — re-reads the selected user's rows from the split stores. Hire someone in HR → People and they're selectable here immediately.</p>`, { icon: "user" });
+  }
+
   /* ---------- shared fragments ---------- */
   function requestRows(device) {
     return rowlist(DATA.mine().map(r => rowitem({
@@ -36,11 +49,13 @@
 
   function alertsList(device) {
     const m = device === "mobile";
-    const payGo = m ? "staff/mobile/payslip/PS-2026-05" : "staff/web/payslips";
+    const ps = DATA.myPayslips()[0]; // acting user's latest slip, if any
+    const payGo = ps ? (m ? "staff/mobile/payslip/" + ps.id : "staff/web/payslips") : (m ? "staff/mobile/me" : "staff/web/payslips");
     const docGo = m ? "staff/mobile/me" : "staff/web/documents";
     const vault = DATA.has("vault");
     return rowlist([
-      rowitem({ icon: "banknote", title: "Payslip for May is ready", sub: "Net ₭ 4,862,000 · published Jun 01", side: badge("ok"), go: payGo }),
+      ps ? rowitem({ icon: "banknote", title: `Payslip for ${ps.period.split(" ")[0]} is ready`, sub: "Net " + kip(ps.net) + " · published " + ps.paid, side: badge("ok"), go: payGo })
+         : rowitem({ icon: "banknote", title: "First payslip arrives with the next pay run", sub: "PR-2026-06 · cutoff Jun 25", side: `<span class="badge plain">Upcoming</span>`, neutral: 1, go: payGo }),
       rowitem({ icon: "megaphone", title: "Town hall — Friday 14:00", sub: "Announcement · canteen, Plant 1", side: `<span class="badge plain">In-app</span>`, neutral: 1 }),
       vault
         ? rowitem({ icon: "shield", title: "Acknowledge Code of conduct v4", sub: "Due Jun 20 · 2 min read", side: badge("pending"), go: docGo })
@@ -67,9 +82,10 @@
   /* ---------- WEB screens ---------- */
   const web = {
     home() {
+      const m = DATA.me.staff;
       return {
-        title: "Good morning, Souksavanh", sub: "Wednesday, June 10 2026 · Production Line A · everything that needs you, in one place.",
-        actions: `<button class="btn soft" data-go="staff/web/requests">${icon("plus")} New request</button>`,
+        title: "Good morning, " + m.name.split(" ")[0], sub: `Wednesday, June 10 2026 · ${m.role} · everything that needs you, in one place.`,
+        actions: `${userPicker()}<button class="btn soft" data-go="staff/web/requests">${icon("plus")} New request</button>`,
         body: `
         <div class="grid cols-3">
           <div class="span-2" style="display:flex;flex-direction:column;gap:16px">
@@ -83,9 +99,9 @@
             ${card("My month", heatcal({ until: 10, levels: { 4: "bad" } }) + `<div class="legend" style="margin-top:12px"><span><i style="background:var(--acc-ln)"></i>Present</span><span><i style="background:var(--bad-bg)"></i>Absence</span><span><i style="background:var(--line-2)"></i>Upcoming</span></div>`, { icon: "calendar" })}
             ${card("My KPIs", `
               <div class="rowlist">
-                ${rowitem({ icon: "check", title: "Attendance", sub: "Trailing 90 days", side: `<b class="num">98%</b>` })}
+                ${rowitem({ icon: "check", title: "Attendance", sub: "Trailing 90 days", side: `<b class="num">${m.attend}%</b>` })}
                 ${rowitem({ icon: "clock", title: "Punctuality", sub: "On-time arrivals", side: `<b class="num">96%</b>` })}
-                ${rowitem({ icon: "sun", title: "Leave balance", sub: "Annual remaining", side: `<b class="num">12 d</b>` })}
+                ${rowitem({ icon: "sun", title: "Leave balance", sub: "Annual remaining", side: `<b class="num">${m.leaveBal} d</b>` })}
                 ${rowitem({ icon: "sparkle", title: "Training", sub: "Safety track", side: `<b class="num">80%</b>` })}
               </div>`, { icon: "pulse" })}
           </div>
@@ -144,7 +160,7 @@
           ${kpi("Open", n("pending"), "Awaiting approval")}
           ${kpi("Approved", n("approved"), "Last 30 days")}
           ${kpi("Returned", n("returned"), "Needs your edit")}
-          ${kpi("Leave balance", "12 d", "Annual · accrues 1.25/mo")}
+          ${kpi("Leave balance", DATA.me.staff.leaveBal + " d", "Annual · accrues 1.25/mo")}
         </div>
         ${card("All requests", `
           <div class="choice-row" style="margin-bottom:12px">
@@ -226,9 +242,18 @@
     },
 
     payslips() {
-      const p = DATA.payslips[0];
+      const mine = DATA.myPayslips(); // v2.3.2.db — slips of the ACTING user only
+      const p = mine[0];
+      if (!p) return {
+        title: "Payslips", sub: "Self-serve slips with tax and social security breakdown — published by each pay run.",
+        actions: userPicker(),
+        body: `
+        ${card("", empty("banknote", "No payslips yet for " + DATA.me.staff.name.split(" ")[0], "The first pay run after hire publishes here — payroll reads the db_people row this user just got."))}
+        ${card("How slips arrive", `<p class="small muted">Pay run ${idtag("PR-2026-06")} (HR → Payroll) generates one serialized slip per active employee at disbursement. New hires join the next cutoff automatically — their master record is already in db_people.</p>`, { icon: "sparkle" })}`
+      };
       return {
         title: "Payslips", sub: "Self-serve slips with tax and social security breakdown — published by each pay run.",
+        actions: userPicker(),
         body: `
         <div class="grid cols-3">
           <div class="card tinted span-2">
@@ -249,7 +274,7 @@
         </div>
         ${card("History", table(
           [{ h: "Period" }, { h: "ID" }, { h: "Gross", r: 1 }, { h: "Net", r: 1 }, { h: "", r: 1 }],
-          DATA.payslips.map(s => ({
+          mine.map(s => ({
             go: `staff/web/payslip/${s.id}`,
             cells: [s.period, idtag(s.id), `<span class="num">${kip(s.gross)}</span>`, `<b class="num">${kip(s.net)}</b>`, icon("chevR")]
           }))), { icon: "history" })}`
@@ -271,9 +296,11 @@
         title: "Documents", sub: "Your vault — personal documents with expiry alerts, policies to acknowledge, and self-serve requests.",
         body: `
         <div class="grid cols-2">
-          ${card("My documents", rowlist(DATA.docs.filter(d => d.kind !== "Policy").map(d => rowitem({
-          icon: "file", title: d.name, sub: `${d.kind} · expires ${d.expiry}`, side: badge(d.status)
-        }))), { icon: "folder" })}
+          ${card("My documents", (DATA.myDocs().filter(d => d.kind !== "Policy").length
+          ? rowlist(DATA.myDocs().filter(d => d.kind !== "Policy").map(d => rowitem({
+            icon: "file", title: d.name, sub: `${d.kind} · expires ${d.expiry}`, side: badge(d.status)
+          })))
+          : empty("folder", "No documents on file yet", "HR uploads contracts & IDs at onboarding — request one below.")), { icon: "folder" })}
           ${card("Policies to acknowledge", rowlist([
           rowitem({ icon: "shield", title: "Code of conduct v4", sub: "Published Jun 02 · due Jun 20", side: `<button class="btn xs" data-act="toast:Acknowledged — recorded to the audit ledger">Acknowledge</button>` }),
           rowitem({ icon: "shield", title: "Safety handbook v7", sub: "Acknowledged May 12", side: badge("ok") })
@@ -324,15 +351,16 @@
               <div><div style="font-weight:800;font-size:16px">${m.name}</div>
               <div class="small muted">${m.role} · ${idtag(m.id)}</div></div></div>
             ${table([{ h: "Field" }, { h: "Value" }], [
-          { cells: ["Division", "Production · Line A"] },
+          { cells: ["Division", m.div + (m.team !== "—" ? " · " + m.team : "")] },
           { cells: ["Site", m.site] },
-          { cells: ["Employment", "Full-time · since Mar 2023"] },
+          { cells: ["Employment", `Full-time · since ${m.since}${m.status === "probation" ? ` · <span class="badge warn plain">probation</span>` : ""}`] },
           { cells: ["Phone", "+856 20 ·· ·· 482"] },
           { cells: ["Bank", "BCEL ····4821"] },
           { cells: ["Emergency contact", "Vanh P. · +856 20 ·· ·· 110"] }
         ])}
           </div>
           <div style="display:flex;flex-direction:column;gap:16px">
+            ${userPickerCard()}
             ${card("Language", `<div class="choice-row"><button class="choice" aria-pressed="true">English</button><button class="choice" data-act="lang-lo">ລາວ</button></div><p class="small muted" style="margin-top:10px">Bilingual UI is a platform feature — the Lao pack is staged for the build phase.</p>`, { icon: "globe" })}
             ${card("My access", `<p class="small muted">Persona <b style="color:var(--acc-d)">Staff · ESS</b> — create &amp; edit own data, submit requests. Scope enforced by the kernel on every call.</p>`, { icon: "lock" })}
           </div>
@@ -348,15 +376,15 @@
         title: "My day", body: `
         ${clockCard()}
         <div class="grid cols-2">
-          ${kpi("Leave", "12 d", "balance")}
-          ${kpi("Requests", "2", "open")}
+          ${kpi("Leave", DATA.me.staff.leaveBal + " d", "balance")}
+          ${kpi("Requests", String(DATA.mine().filter(r => r.status === "pending").length), "open")}
         </div>
         ${card("Alerts", alertsList("mobile"), { icon: "bell" })}
         ${card("My requests", requestRows("mobile"), { icon: "inbox" })}
         ${card(t("common.quickActions"), `<div class="choice-row">
           <button class="choice" data-go="staff/mobile/request-new/Leave">${icon("calendar")} Leave</button>
           <button class="choice" data-go="staff/mobile/request-new/Claim">${icon("receipt")} Claim</button>
-          <button class="choice" data-go="staff/mobile/payslip/PS-2026-05">${icon("banknote")} Payslip</button>
+          <button class="choice" data-go="${DATA.myPayslips()[0] ? "staff/mobile/payslip/" + DATA.myPayslips()[0].id : "staff/mobile/me"}">${icon("banknote")} Payslip</button>
         </div>`, { icon: "sparkle" })}`
       };
     },
@@ -384,8 +412,13 @@
       return {
         title: "Me", body: `
         ${card("", `<div style="display:flex;align-items:center;gap:13px">${avatar(m.name, 1)}<div><div style="font-weight:800">${m.name}</div><div class="small muted">${m.role}</div></div></div>`)}
-        ${card("Payslips", rowlist(DATA.payslips.map(p => rowitem({ icon: "banknote", title: p.period, sub: "Net " + kip(p.net), side: icon("chevR"), go: `staff/mobile/payslip/${p.id}` }))), { icon: "banknote" })}
-        ${card("Documents", rowlist(DATA.docs.slice(0, 3).map(d => rowitem({ icon: "file", title: d.name, sub: d.kind + " · " + d.expiry, side: badge(d.status) }))), { icon: "folder" })}
+        ${card("Switch user — db_people", userPicker() + `<p class="small muted" style="margin-top:8px">New hires are selectable immediately.</p>`, { icon: "user" })}
+        ${card("Payslips", (DATA.myPayslips().length
+          ? rowlist(DATA.myPayslips().map(p => rowitem({ icon: "banknote", title: p.period, sub: "Net " + kip(p.net), side: icon("chevR"), go: `staff/mobile/payslip/${p.id}` })))
+          : empty("banknote", "No payslips yet", "Published by the next pay run")), { icon: "banknote" })}
+        ${card("Documents", (DATA.myDocs().length
+          ? rowlist(DATA.myDocs().slice(0, 3).map(d => rowitem({ icon: "file", title: d.name, sub: d.kind + " · " + d.expiry, side: badge(d.status) })))
+          : empty("folder", "No documents yet", "HR uploads at onboarding")), { icon: "folder" })}
         ${card("Language", `<div class="choice-row"><button class="choice" aria-pressed="true">EN</button><button class="choice" data-act="lang-lo">ລາວ</button></div>`, { icon: "globe" })}`
       };
     },

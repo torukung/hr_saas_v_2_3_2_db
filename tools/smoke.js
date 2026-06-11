@@ -144,6 +144,43 @@ if (DATA.org().headcount !== hc0) errors.push("staff: offboard did not restore d
 DATA.state.tier = "professional";
 if (DATA.org().headcount !== 248) errors.push("staff: professional snapshot should stay at the 248-org");
 
+/* ---------- acting staff lens — new users selectable & usable EVERYWHERE ---------- */
+DATA.state.tier = "essential";
+const newId = DATA.hireStaff({ name: "Khamphone Soudavanh", pos: "Machine Operator", div: "Production", team: "Line A" });
+if (!DATA.employees.find(e => e.id === newId)) errors.push("lens: hireStaff row missing in db_people");
+if (!DB.list("db_leave", "balances").find(b => b.emp === newId)) errors.push("lens: leave balance not provisioned on hire (event chain)");
+DATA.setActingStaff(newId);
+if (DATA.me.staff.id !== newId || DATA.me.staff.name !== "Khamphone Soudavanh") errors.push("lens: acting staff did not switch to new user");
+const rq = DATA.submitRequest("Leave", "annual leave · new user");
+const rqRow = DATA.requests.find(r => r.id === rq);
+if (!rqRow || rqRow.who !== "Khamphone Soudavanh") errors.push("lens: request not attributed to acting user");
+if (!DATA.pendingL1().find(r => r.id === rq)) errors.push("lens: manager L1 queue does not see new user's request");
+if (!DATA.mine().find(r => r.id === rq)) errors.push("lens: 'my requests' does not follow acting user");
+if (DATA.myPayslips().length !== 0) errors.push("lens: brand-new user should have zero payslips");
+if (!DATA.team.find(e => e.id === newId)) errors.push("lens: new Line A hire missing from manager team lens");
+// every Staff screen must render cleanly for the brand-new user (no slips/docs/punches)
+for (const dev of ["web", "mobile"]) {
+  for (const [sid, fn] of Object.entries(PERSONAS.staff[dev])) {
+    try {
+      const out = fn(params[sid]);
+      if (!out || !out.body || /undefined|NaN|\[object Object\]/.test(out.body)) errors.push(`lens: staff/${dev}/${sid} renders broken for new user`);
+    } catch (e) { errors.push(`lens: staff/${dev}/${sid} THROWS for new user — ${e.message}`); }
+  }
+}
+// cross-check: the new user is visible in every other lens that should list them
+if (!PERSONAS.staff.web.home().actions.includes(newId)) errors.push("lens: user picker missing new user");
+if (!PERSONAS.hr.web.people().body.includes(newId)) errors.push("lens: HR directory missing new user");
+if (!PERSONAS.hr.web.person(newId).title.includes("Khamphone")) errors.push("lens: HR person page wrong for new user");
+if (!PERSONAS.manager.web.team().body.includes(newId)) errors.push("lens: manager roster missing new user");
+if (!PERSONAS.manager.web.overview().body.includes(newId)) errors.push("lens: manager team board missing new user");
+if (!PERSONAS.staff.web.mydata().body.includes(rq)) errors.push("lens: My data missing new user's request");
+// offboard: lens falls back safely, row gone everywhere
+DATA.offboardStaff(newId);
+if (DATA.me.staff.id === newId) errors.push("lens: acting user not reset after offboard");
+if (PERSONAS.hr.web.people().body.includes(newId)) errors.push("lens: offboarded user still in HR directory");
+DATA.setActingStaff("EMP-0214");
+DB.reset("db_workflow");
+
 console.log(`rendered ${rendered} screens across ${Object.keys(PERSONAS).length} personas ×2 devices`);
 if (warns.length) console.log("WARN:\n  " + warns.join("\n  "));
 if (errors.length) { console.log("FAIL:\n  " + errors.join("\n  ")); process.exit(1); }
