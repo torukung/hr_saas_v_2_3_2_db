@@ -12,7 +12,7 @@
 window.DB = (function () {
   const TENANT = "phoungern";
   const NS = "adeptio.v232.";
-  const SEED_VERSION = 4;
+  const SEED_VERSION = 5; // v5: 32-staff pilot roster + live-derived org KPIs
 
   /* localStorage — with in-memory shim so tools/smoke.js (node) runs */
   let LS;
@@ -41,7 +41,10 @@ window.DB = (function () {
   function seeds() {
     return {
       db_people: {
+        // 32 active staff — the pilot-site roster. Add / delete / reassign via
+        // HR → People (New hire · Offboard · Reassign) or Manager → Team data.
         employees: [
+          // Production · Line A (8 + supervisor)
           { id: "EMP-0214", name: "Souksavanh Phommachanh", pos: "Machine Operator", div: "Production", team: "Line A", state: "present", in: "08:30", attend: 98, ot: 6,  leaveBal: 12, since: "Mar 2023" },
           { id: "EMP-0231", name: "Manysone Vongphachanh",  pos: "Machine Operator", div: "Production", team: "Line A", state: "present", in: "08:24", attend: 96, ot: 11, leaveBal: 8,  since: "Aug 2024" },
           { id: "EMP-0188", name: "Noy Keomany",            pos: "QC Inspector",     div: "Production", team: "Line A", state: "late",    in: "09:12", attend: 91, ot: 3,  leaveBal: 10, since: "Nov 2022" },
@@ -51,9 +54,35 @@ window.DB = (function () {
           { id: "EMP-0240", name: "Chanthala Phimmasone",   pos: "Packer",           div: "Production", team: "Line A", state: "present", in: "08:31", attend: 95, ot: 5,  leaveBal: 9,  since: "Oct 2025" },
           { id: "EMP-0193", name: "Keo Sayavong",           pos: "Forklift Driver",  div: "Production", team: "Line A", state: "absent",  in: "—",     attend: 88, ot: 9,  leaveBal: 6,  since: "Jun 2022", status: "flagged" },
           { id: "EMP-0098", name: "Khamla Sisouphanh",      pos: "Supervisor · Line A", div: "Production", team: "—",  state: "present", in: "08:02", attend: 99, ot: 0,  leaveBal: 16, since: "Jan 2020" },
-          { id: "EMP-0244", name: "Davone Phanthavong",     pos: "Account Executive",   div: "Sales",     team: "—",  state: "present", in: "08:45", attend: 93, ot: 1,  leaveBal: 5,  since: "Feb 2026", status: "probation" },
-          { id: "EMP-0156", name: "Latsamy Vorachit",       pos: "Payroll Officer",     div: "Finance",   team: "—",  state: "present", in: "08:21", attend: 98, ot: 0,  leaveBal: 13, since: "Sep 2021" },
-          { id: "EMP-0021", name: "Vilayvanh Chanthavong",  pos: "HR Operations Lead",  div: "Admin",     team: "—",  state: "present", in: "07:58", attend: 99, ot: 0,  leaveBal: 15, since: "Apr 2019" }
+          // Production · Line B (7)
+          { id: "EMP-0102", name: "Bouasone Keopaseuth",    pos: "Supervisor · Line B", div: "Production", team: "—",  state: "present", in: "08:05", attend: 98, ot: 0,  leaveBal: 14, since: "Mar 2020" },
+          { id: "EMP-0218", name: "Khampheng Vilaysack",    pos: "Machine Operator", div: "Production", team: "Line B", state: "present", in: "08:26", attend: 97, ot: 9,  leaveBal: 10, since: "Apr 2023" },
+          { id: "EMP-0222", name: "Outhai Sengsouvanh",     pos: "Machine Operator", div: "Production", team: "Line B", state: "present", in: "08:28", attend: 95, ot: 7,  leaveBal: 8,  since: "Sep 2023" },
+          { id: "EMP-0237", name: "Viengsavanh Phrachanh",  pos: "QC Inspector",     div: "Production", team: "Line B", state: "present", in: "08:22", attend: 98, ot: 4,  leaveBal: 12, since: "Jan 2025" },
+          { id: "EMP-0210", name: "Sengphet Chanthavixay",  pos: "Line Technician",  div: "Production", team: "Line B", state: "present", in: "08:15", attend: 99, ot: 12, leaveBal: 13, since: "Aug 2022" },
+          { id: "EMP-0185", name: "Daosavanh Inthirath",    pos: "Packer",           div: "Production", team: "Line B", state: "present", in: "08:33", attend: 94, ot: 6,  leaveBal: 7,  since: "Oct 2022" },
+          { id: "EMP-0249", name: "Phoutthasone Vongsa",    pos: "Packer",           div: "Production", team: "Line B", state: "present", in: "08:30", attend: 96, ot: 3,  leaveBal: 15, since: "Apr 2026", status: "probation" },
+          // Production · plant-wide
+          { id: "EMP-0150", name: "Amphone Thammavong",     pos: "Safety Officer",   div: "Production", team: "—",  state: "present", in: "08:10", attend: 99, ot: 1,  leaveBal: 11, since: "Jun 2021" },
+          // Sales (4)
+          { id: "EMP-0134", name: "Anousone Rattanavong",   pos: "Sales Manager",      div: "Sales",     team: "—",  state: "present", in: "08:40", attend: 97, ot: 0,  leaveBal: 12, since: "Feb 2021" },
+          { id: "EMP-0244", name: "Davone Phanthavong",     pos: "Account Executive",  div: "Sales",     team: "—",  state: "present", in: "08:45", attend: 93, ot: 1,  leaveBal: 5,  since: "Feb 2026", status: "probation" },
+          { id: "EMP-0228", name: "Malisa Phengdy",         pos: "Account Executive",  div: "Sales",     team: "—",  state: "present", in: "08:38", attend: 96, ot: 2,  leaveBal: 9,  since: "Nov 2023" },
+          { id: "EMP-0246", name: "Thipphavanh Soulinthone",pos: "Sales Coordinator",  div: "Sales",     team: "—",  state: "present", in: "08:35", attend: 98, ot: 0,  leaveBal: 13, since: "Mar 2026", status: "probation" },
+          // Logistics (4)
+          { id: "EMP-0117", name: "Sourioudong Keola",      pos: "Logistics Supervisor", div: "Logistics", team: "—", state: "present", in: "08:08", attend: 98, ot: 2,  leaveBal: 14, since: "Jul 2020" },
+          { id: "EMP-0203", name: "Khamsing Phialath",      pos: "Warehouse Officer",    div: "Logistics", team: "—", state: "present", in: "08:20", attend: 96, ot: 8,  leaveBal: 10, since: "May 2022" },
+          { id: "EMP-0219", name: "Phonepadith Luanglath",  pos: "Driver",               div: "Logistics", team: "—", state: "present", in: "07:50", attend: 97, ot: 10, leaveBal: 9,  since: "Jan 2023" },
+          { id: "EMP-0235", name: "Somchai Douangdara",     pos: "Forklift Driver",      div: "Logistics", team: "—", state: "present", in: "08:12", attend: 95, ot: 7,  leaveBal: 8,  since: "Dec 2024" },
+          // Finance (3)
+          { id: "EMP-0156", name: "Latsamy Vorachit",       pos: "Payroll Officer",    div: "Finance",   team: "—",  state: "present", in: "08:21", attend: 98, ot: 0,  leaveBal: 13, since: "Sep 2021" },
+          { id: "EMP-0142", name: "Chindavone Sisavath",    pos: "Accountant",         div: "Finance",   team: "—",  state: "present", in: "08:25", attend: 99, ot: 0,  leaveBal: 12, since: "Oct 2021" },
+          { id: "EMP-0167", name: "Ketsana Phommavong",     pos: "AP Officer",         div: "Finance",   team: "—",  state: "present", in: "08:27", attend: 97, ot: 0,  leaveBal: 11, since: "Feb 2022" },
+          // Admin (4)
+          { id: "EMP-0021", name: "Vilayvanh Chanthavong",  pos: "HR Operations Lead", div: "Admin",     team: "—",  state: "present", in: "07:58", attend: 99, ot: 0,  leaveBal: 15, since: "Apr 2019" },
+          { id: "EMP-0089", name: "Bountheung Sayasone",    pos: "Office Manager",     div: "Admin",     team: "—",  state: "present", in: "08:00", attend: 99, ot: 0,  leaveBal: 16, since: "Aug 2019" },
+          { id: "EMP-0177", name: "Noulak Chanthachone",    pos: "IT Support",         div: "Admin",     team: "—",  state: "present", in: "08:14", attend: 97, ot: 1,  leaveBal: 10, since: "Jun 2023" },
+          { id: "EMP-0233", name: "Vansana Keomixay",       pos: "Receptionist",       div: "Admin",     team: "—",  state: "present", in: "07:55", attend: 98, ot: 0,  leaveBal: 12, since: "Jan 2024" }
         ],
         divisions: [
           { name: "Production", staff: 142, cost: 38.2, attr: 6.1, ot: 412 },
@@ -149,13 +178,17 @@ window.DB = (function () {
       },
       dw_reports: {
         org_snapshots: [
-          { tier: "essential", headcount: 48, present: 45, presentPct: "93.8%", late: 1, absent: 1, onleave: 1,
-            newMoM: "+1", runStaff: 48, gross: "₭ 276M", net: "₭ 234M", broadcast: 48, segment: 27,
+          // headcount / present / late / absent / onleave / division staff counts are
+          // DERIVED LIVE from db_people.employees by DATA.org() on this tier —
+          // add or offboard a staff member and the KPIs move. Static fields below
+          // (cost %, gross, …) stay snapshot values pending the payroll cell.
+          { tier: "essential", headcount: 32, present: 29, presentPct: "90.6%", late: 1, absent: 1, onleave: 1,
+            newMoM: "+2", runStaff: 32, gross: "₭ 186M", net: "₭ 158M", broadcast: 32, segment: 18,
             divisions: [
-              { name: "Production", staff: 27, cost: 41.0, attr: 5.8, ot: 84 },
-              { name: "Sales",      staff: 7,  cost: 16.2, attr: 8.1, ot: 18 },
-              { name: "Logistics",  staff: 6,  cost: 12.4, attr: 7.2, ot: 26 },
-              { name: "Finance",    staff: 4,  cost: 9.8,  attr: 4.0, ot: 5 },
+              { name: "Production", staff: 17, cost: 41.0, attr: 5.8, ot: 84 },
+              { name: "Sales",      staff: 4,  cost: 16.2, attr: 8.1, ot: 18 },
+              { name: "Logistics",  staff: 4,  cost: 12.4, attr: 7.2, ot: 26 },
+              { name: "Finance",    staff: 3,  cost: 9.8,  attr: 4.0, ot: 5 },
               { name: "Admin",      staff: 4,  cost: 6.4,  attr: 4.4, ot: 3 }
             ] },
           { tier: "professional", headcount: 248, present: 236, presentPct: "95.1%", late: 4, absent: 3, onleave: 5,

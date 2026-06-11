@@ -207,15 +207,50 @@
       };
     },
 
+    /* ---------- v2.3.2.db — new hire (writes db_people through the People cell) ---------- */
+    "person-new"() {
+      const divs = ["Production", "Sales", "Logistics", "Finance", "Admin"];
+      const teams = ["—", "Line A", "Line B"];
+      return {
+        title: "New hire", sub: "Creates the master record in db_people (EMP-#### · flow F) — every other module starts reading it instantly.",
+        crumbs: [{ label: "People & Org", go: "hr/web/people" }, { label: "New hire" }],
+        body: `
+        <div class="grid cols-3">
+          <div class="card span-2">
+            <div class="grid cols-2">
+              <div class="field"><label>Full name</label><input class="input" id="st-name" placeholder="e.g. Khamphone Soudavanh"></div>
+              <div class="field"><label>Position</label><input class="input" id="st-pos" placeholder="e.g. Machine Operator"></div>
+            </div>
+            <div class="grid cols-2">
+              <div class="field"><label>Division</label><select class="input" id="st-div">${divs.map(d => `<option>${d}</option>`).join("")}</select></div>
+              <div class="field"><label>Team assignment</label><select class="input" id="st-team">${teams.map(x => `<option>${x}</option>`).join("")}</select><span class="hint">Assign “Line A” and the new hire appears on the Manager's roster, attendance board and schedule immediately.</span></div>
+            </div>
+            <div style="display:flex;gap:9px;justify-content:flex-end">
+              <button class="btn ghost" data-go="hr/web/people">${t("common.cancel")}</button>
+              <button class="btn" data-act="staff-add">${icon("plus")} Create employee record</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            ${card("What happens on create", rowlist([
+              rowitem({ icon: "users", title: "Row lands in db_people", sub: "EMP-#### auto-issued · status: probation", side: "" }),
+              rowitem({ icon: "lock", title: "employee.hired fact", sub: "appended to db_audit", side: "" }),
+              rowitem({ icon: "chart", title: "Org KPIs move", sub: "headcount & division counts re-derive", side: "" })
+            ]), { icon: "layers" })}
+            ${card("One writer", `<p class="small muted">Only the People cell writes db_people — managers see the new row through their lens, never a copy. Offboarding later is the mirror image: export + delete, audit-logged.</p>`, { icon: "shield" })}
+          </div>
+        </div>`
+      };
+    },
+
     people() {
       return {
-        title: "People & Org", sub: "Master record and the org backbone — every other module reads from here.",
-        actions: `<button class="btn soft" data-act="toast:Org chart export queued">${icon("download")} Org chart</button><button class="btn" data-act="toast:Onboarding flow opens here (EMP-#### · flow F)">${icon("plus")} New hire</button>`,
+        title: "People & Org", sub: "Master record and the org backbone — every other module reads from here. Live from db_people: hire, reassign and offboard.",
+        actions: `<button class="btn soft" data-act="toast:Org chart export queued">${icon("download")} Org chart</button><button class="btn" data-go="hr/web/person-new">${icon("plus")} New hire</button>`,
         body: `
         <div class="grid cols-4">
-          ${kpi("Headcount", String(DATA.org().headcount), DATA.org().newMoM + " MoM", { hero: 1 })}
-          ${kpi("Divisions", "5", "12 departments")}
-          ${kpi("On probation", "6", "2 ending this month")}
+          ${kpi("Active staff", String(DATA.employees.length), DATA.org().newMoM + " MoM · db_people live", { hero: 1 })}
+          ${kpi("Divisions", "5", "Production · Sales · Logistics · Finance · Admin")}
+          ${kpi("On probation", String(DATA.employees.filter(p => p.status === "probation").length), "review at 90 days")}
           ${kpi("Open lifecycle", "4", "1 onboard · 2 transfer · 1 exit")}
         </div>
         ${card("Directory", `
@@ -257,6 +292,16 @@
         ])}
           </div>
           <div style="display:flex;flex-direction:column;gap:16px">
+            ${card("Manage record — db_people", `
+              <div class="grid cols-2">
+                <div class="field"><label>Division</label><select class="input" id="as-div">${["Production", "Sales", "Logistics", "Finance", "Admin"].map(d => `<option ${p.div === d ? "selected" : ""}>${d}</option>`).join("")}</select></div>
+                <div class="field"><label>Team</label><select class="input" id="as-team">${["—", "Line A", "Line B"].map(x => `<option ${p.team === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <button class="btn soft" data-act="staff-assign:${p.id}">${icon("users")} Apply reassignment</button>
+                <button class="btn danger" data-act="staff-del:${p.id}">${icon("logout")} Offboard &amp; remove</button>
+              </div>
+              <p class="small muted" style="margin-top:10px">Reassignment moves the row (managers' lenses update instantly); offboarding is export + delete — both land on db_audit.</p>`, { icon: "settings" })}
             ${card("Lifecycle", steps([{ t: "Onboard", s: p.since }, { t: "Active", s: "current" }, { t: "Transfer", s: "—" }, { t: "Offboard", s: "—" }], 1), { icon: "layers" })}
             ${card("Ledger trail", rowlist(DATA.requests.filter(r => r.who === p.name).slice(0, 3).map(r => rowitem({ icon: "inbox", title: `${r.id} · ${r.detail}`, sub: r.stage, side: badge(r.status) })) || []), { icon: "history" })}
           </div>
@@ -494,7 +539,7 @@
       { group: "Insight", items: [{ id: "reports", icon: "chart", label: t("hr.reports") }] },
       { group: "Data", items: [{ id: "data", icon: "layers", label: "Data manager" }] }
     ],
-    parent: { approval: "approvals", person: "people", "payroll-run": "payroll" },
+    parent: { approval: "approvals", person: "people", "person-new": "people", "payroll-run": "payroll" },
     tabs: [
       { id: "queue", icon: "inbox", label: "Queue", lock: "l2" },
       { id: "alerts", icon: "bell", label: "Alerts" },

@@ -203,6 +203,12 @@
             ${card("Team requests — db_workflow.requests", DBV.tableEditor("db_workflow", "requests", { canAdd: false, canDel: false }) + `<p class="small muted" style="margin-top:8px">Decisions happen in the Approvals queue (the cell API) — the table here is the store truth those buttons mutate.</p>`, { icon: "inbox" })}
           </div>
           <div style="display:flex;flex-direction:column;gap:16px">
+            ${card("Assign existing staff to Line A", `
+              <div class="field"><label>Staff member</label>
+                <select class="input" id="mg-assign">${DATA.employees.filter(e => e.team !== "Line A").map(e => `<option value="${e.id}">${e.name} · ${e.pos} (${e.div})</option>`).join("")}</select>
+              </div>
+              <button class="btn soft" style="width:100%" data-act="mgr-assign">${icon("users")} Assign to my team</button>
+              <p class="small muted" style="margin-top:10px">Sets <b>team → Line A</b> on the db_people row — roster, attendance board and schedule pick it up on the same write. New hires are created by HR (People &amp; Org → New hire); managers assign, never create.</p>`, { icon: "plus" })}
             ${card("Stores you touch", DBV.storeGrid(null, ["db_people", "db_time", "db_leave", "db_workflow"]), { icon: "layers" })}
             ${card("One writer per store", `<p class="small muted">Approving ${idtag("LV-0481")} writes <b>db_workflow</b> only; the fact lands on <b>db_audit</b>; the projector updates <b>dw_reports</b>. A bad write in leave can never reach payroll — corruption stays inside one file.</p>`, { icon: "shield" })}
           </div>

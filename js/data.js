@@ -58,10 +58,25 @@ window.DATA = (function () {
     notify();
   }
 
-  /* ---------- tier-aware org numbers — read from dw_reports (L-DR) ---------- */
+  /* ---------- tier-aware org numbers — read from dw_reports (L-DR) ----------
+     On Essential (the pilot site = the actual db_people roster) the head-
+     count, presence and division staff numbers are DERIVED LIVE from the
+     employees table — hire or offboard someone and every KPI moves.
+     Pro keeps the 248-org snapshot (directory shows the pilot sample). */
   function org() {
-    const snap = DB.list("dw_reports", "org_snapshots").find(s => s.tier === state.tier);
-    return snap || DB.list("dw_reports", "org_snapshots")[0];
+    const snaps = DB.list("dw_reports", "org_snapshots");
+    const snap = snaps.find(s => s.tier === state.tier) || snaps[0];
+    if (!snap || state.tier !== "essential") return snap;
+    const emp = DB.list("db_people", "employees");
+    const c = (st) => emp.filter(e => e.state === st).length;
+    const present = c("present");
+    return {
+      ...snap,
+      headcount: emp.length, present, late: c("late"), absent: c("absent"), onleave: c("onleave"),
+      presentPct: emp.length ? (Math.round(present / emp.length * 1000) / 10).toFixed(1) + "%" : "—",
+      runStaff: emp.length, broadcast: emp.length,
+      divisions: snap.divisions.map(d => ({ ...d, staff: emp.filter(e => e.div === d.name).length }))
+    };
   }
   const series = (id) => DB.list("dw_reports", "series").find(s => s.id === id) || { values: [0], labels: [], actual: [0], budget: [0] };
 

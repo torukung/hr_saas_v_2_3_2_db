@@ -126,6 +126,24 @@ if (DB.provisioned("db_docs")) errors.push("db: db_docs should not be provisione
 DATA.state.tier = "professional";
 if (!DB.provisioned("db_docs")) errors.push("db: db_docs should be provisioned on professional");
 
+/* ---------- staff lifecycle — add / assign / delete with live org KPIs ---------- */
+DB.reset("db_people");
+DATA.state.tier = "essential";
+const hc0 = DATA.org().headcount;
+if (hc0 < 30 || hc0 > 35) errors.push("staff: pilot roster should be 30–35 active staff, got " + hc0);
+if (DATA.org().present + DATA.org().late + DATA.org().absent + DATA.org().onleave !== hc0) errors.push("staff: derived presence states don't sum to headcount");
+DB.add("db_people", "employees", { id: "EMP-9001", name: "Lifecycle Test", pos: "QA", div: "Sales", team: "—", state: "present", in: "08:00", attend: 100, ot: 0, leaveBal: 15, since: "Jun 2026", status: "probation" });
+if (DATA.org().headcount !== hc0 + 1) errors.push("staff: org headcount did not re-derive after hire");
+const salesN = DB.list("db_people", "employees").filter(e => e.div === "Sales").length;
+if (DATA.org().divisions.find(d => d.name === "Sales").staff !== salesN) errors.push("staff: division staff counts not derived live");
+const e9 = DB.list("db_people", "employees").find(e => e.id === "EMP-9001");
+e9.team = "Line A"; DB.persist("db_people"); // assign (what staff-assign / mgr-assign do)
+if (!DATA.team.find(e => e.id === "EMP-9001")) errors.push("staff: team assignment not visible through DATA.team lens");
+DB.del("db_people", "employees", "id", "EMP-9001"); // offboard
+if (DATA.org().headcount !== hc0) errors.push("staff: offboard did not restore derived headcount");
+DATA.state.tier = "professional";
+if (DATA.org().headcount !== 248) errors.push("staff: professional snapshot should stay at the 248-org");
+
 console.log(`rendered ${rendered} screens across ${Object.keys(PERSONAS).length} personas ×2 devices`);
 if (warns.length) console.log("WARN:\n  " + warns.join("\n  "));
 if (errors.length) { console.log("FAIL:\n  " + errors.join("\n  ")); process.exit(1); }
