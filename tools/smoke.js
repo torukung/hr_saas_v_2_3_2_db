@@ -10,6 +10,7 @@ eval(code("js/ui.js"));
 eval(code("js/db.js"));      // v2.3.2.db — the split data layer (in-memory shim in node)
 eval(code("js/data.js"));
 eval(code("js/screens/dbviews.js"));
+eval(code("js/screens/reports.js"));
 for (const f of ["staff", "manager", "hr", "ceo", "sysadmin"]) eval(code("js/screens/" + f + ".js"));
 
 const errors = [], warns = [];
@@ -17,7 +18,7 @@ const params = {
   "request-detail": "LV-0481", "payslip": "PS-2026-05", "request-new": "Claim",
   "approval": "EX-0210", "member": "EMP-0214", "person": "EMP-0214",
   "payroll-run": "PR-2026-06", "division": "Sales", "template": "TPL-023",
-  "dbstore": "db_people", "data": "db_people"
+  "dbstore": "db_people", "data": "db_people", "report-run": "RPT-1010"
 };
 const screens = {}; // collect existing screen ids per persona/device
 
@@ -180,6 +181,56 @@ if (DATA.me.staff.id === newId) errors.push("lens: acting user not reset after o
 if (PERSONAS.hr.web.people().body.includes(newId)) errors.push("lens: offboarded user still in HR directory");
 DATA.setActingStaff("EMP-0214");
 DB.reset("db_workflow");
+
+/* ---------- reports — runs, last-3 visibility, file storage, dynamism ---------- */
+// every persona has a report section; every catalog entry builds clean on both tiers
+const REPORT_PERSONAS = ["staff", "manager", "hr", "ceo", "sysadmin"];
+for (const tier of ["essential", "professional"]) {
+  DATA.state.tier = tier;
+  for (const persona of REPORT_PERSONAS) {
+    if (!REP.ids(persona).length) errors.push(`report: persona ${persona} has no report section`);
+    const lib = REP.library(persona, persona + "/web");
+    if (!lib || /undefined|NaN|\[object Object\]/.test(lib)) errors.push(`report [${tier}]: ${persona} library renders broken`);
+    for (const rid of REP.ids(persona)) {
+      const m = REP.meta(rid);
+      if (m.gate && !DATA.has(m.gate)) continue;
+      const probe = [m.headline(), m.query()].join(" ") + JSON.stringify(m.kpis()) + JSON.stringify(m.rows());
+      if (/undefined|NaN/.test(probe)) errors.push(`report [${tier}]: ${rid} computes broken values`);
+    }
+  }
+}
+DATA.state.tier = "essential";
+// seeded runs: last-3 visible, older archived (team-attendance seeds 4 runs)
+const taRuns = DB.reports.runs("team-attendance");
+if (taRuns.filter(r => !r.archived).length !== 3) errors.push("report: seeded team-attendance should show exactly 3 visible runs");
+if (!taRuns.find(r => r.archived)) errors.push("report: seeded team-attendance should have an archived run in file storage");
+// generate: a new run is saved, becomes head, pushes the 3rd into the archive
+const visBefore = DB.reports.runs("team-attendance").filter(r => !r.archived).map(r => r.id);
+const newRun = REP.generate("team-attendance");
+if (!newRun || DB.reports.runs("team-attendance")[0].id !== newRun.id) errors.push("report: generate did not save the run at head");
+const visAfter = DB.reports.runs("team-attendance").filter(r => !r.archived);
+if (visAfter.length !== 3) errors.push("report: visibility window must stay at 3 after generate");
+if (visAfter.map(r => r.id).includes(visBefore[2])) errors.push("report: oldest visible run should have moved to file storage");
+// dynamism: a new hire appears in the NEXT generated run, not the stored one
+const dynId = DATA.hireStaff({ name: "Report Dynamic", pos: "Packer", div: "Production", team: "Line A" });
+if (JSON.stringify(newRun.rows).includes(dynId)) errors.push("report: stored run must be a frozen snapshot");
+const dynRun = REP.generate("team-attendance");
+if (!JSON.stringify(dynRun.rows).includes(dynId)) errors.push("report: new run not dynamic to new hire");
+if (!REP.runPage(dynRun.id, "manager", "manager/web").body.includes(dynId)) errors.push("report: run viewer missing new hire");
+// file storage: folders per report, archived files listed, delete works
+const fp = REP.filesPage("manager", "manager/web");
+if (!fp.folders.includes("reports/" + DB.TENANT + "/team-attendance/")) errors.push("report: file storage missing per-report folder path");
+const arch = DB.reports.runs("team-attendance").find(r => r.archived);
+if (!arch || !fp.folders.includes(arch.id)) errors.push("report: archived run not listed in file storage");
+if (!DB.reports.remove(arch.id)) errors.push("report: expire from storage failed");
+if (DB.reports.runs().find(r => r.id === arch.id)) errors.push("report: expired run still present");
+// gating: executive blocked on essential, open on pro
+if (REP.generate("executive") !== null) errors.push("report: executive should refuse to generate on essential");
+DATA.state.tier = "professional";
+if (!REP.generate("executive")) errors.push("report: executive should generate on professional");
+DATA.state.tier = "essential";
+DATA.offboardStaff(dynId);
+DB.reset("dw_reports"); // restore seeded runs for a clean slate
 
 console.log(`rendered ${rendered} screens across ${Object.keys(PERSONAS).length} personas ×2 devices`);
 if (warns.length) console.log("WARN:\n  " + warns.join("\n  "));
