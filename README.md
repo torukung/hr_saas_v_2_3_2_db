@@ -12,6 +12,28 @@ Local: double-click `index.html` (everything is relative-path, file:// safe — 
 
 GitHub Pages: push this folder as a repo → Settings → Pages → deploy from branch → root. `.nojekyll` is included.
 
+## Cloud sync (Turso) — optional, hybrid offline-first
+
+Out of the box the app is **self-sustaining per browser**: each visitor's data lives in their own localStorage. To make it a *shared, durable* database, fill in `js/turso-config.js` and the hybrid sync layer (`js/turso-sync.js`) goes live:
+
+- **localStorage stays the working cache** — instant UI, still works offline and on `file://`
+- every `DB.persist()` lands in a localStorage **outbox**, then pushes that store's table group to Turso (one DB, ten prefixed groups: `people_employees`, `time_punches`, `audit_events`, …)
+- **on load**, `sync_meta.updated_at` is compared per store against the local envelope — last-writer-wins at store granularity; newer cloud stores hydrate in and the UI re-renders
+- offline writes queue and drain on reconnect; a ☁ badge (bottom-right) shows sync state and force-syncs on click
+- empty config → zero network calls, exactly the old behavior
+
+Provision:
+
+```bash
+turso db create adeptio-hr-v232
+turso db show adeptio-hr-v232 --url        # → url for js/turso-config.js
+turso db tokens create adeptio-hr-v232     # → token for js/turso-config.js
+```
+
+Tables are created automatically on first sync. Verify the layer without a network: `node tools/sync-smoke.js .`
+
+> ⚠ The token ships to every visitor's browser — scope it to this one database and treat the deployment as a pilot/demo. For production, put writes behind an edge function so the token stays server-side.
+
 ## The database, in 60 seconds
 
 | Store | Layer | Holds | Writer |
